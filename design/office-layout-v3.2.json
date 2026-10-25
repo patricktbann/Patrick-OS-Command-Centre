@@ -1,0 +1,374 @@
+{
+  "schemaVersion": "3.2.0",
+  "product": "TSY Group of Companies — AI Agent Office",
+  "status": "architectural design baseline only",
+  "baseline": {
+    "source": "release/tsy-ai-office-v3.1-frozen",
+    "frozen": true
+  },
+  "coordinateUnits": "proportional floor-planning units, not construction measurements",
+  "navigation": {
+    "modes": [
+      "3D Office",
+      "2D Floor Plan"
+    ],
+    "buttons": [
+      "reset",
+      "rotate-left",
+      "rotate-right",
+      "zoom-in",
+      "zoom-out",
+      "up",
+      "down",
+      "left",
+      "right",
+      "fullscreen"
+    ],
+    "quickJumps": [
+      "group-command",
+      "meeting-hub",
+      "training-upgrade",
+      "future-expansion"
+    ],
+    "preserveV31Behavior": true
+  },
+  "permissions": {
+    "profileChanges": "browser local until secure backend",
+    "agentExecution": "none implied by profile",
+    "purchaseOrDeployment": "requires separate approval"
+  },
+  "divisions": [
+    {
+      "id": "group-command",
+      "name": "Group Command",
+      "template": "executive-suite",
+      "rooms": [
+        [
+          "ceo",
+          "Group CEO Office",
+          1,
+          "Private executive desk, guest chairs, strategy display"
+        ],
+        [
+          "vice-ceo",
+          "Vice CEO Office",
+          1,
+          "Executive desk, two-person discussion"
+        ],
+        [
+          "pa",
+          "CEO Personal Assistant",
+          1,
+          "Executive scheduling and follow-up workstation"
+        ],
+        [
+          "secretary",
+          "CEO Secretary",
+          1,
+          "Records and executive correspondence workstation"
+        ],
+        [
+          "executive-staff",
+          "Group Command Staff",
+          6,
+          "Team workstations and briefing display"
+        ],
+        [
+          "boardroom",
+          "Executive Boardroom",
+          12,
+          "Board table, executive seats, secure video conference"
+        ]
+      ],
+      "staff": [
+        "Group CEO",
+        "Vice CEO",
+        "CEO Personal Assistant",
+        "CEO Secretary",
+        "Chief of Staff",
+        "Group Command Executive Staff"
+      ]
+    },
+    {
+      "id": "operations",
+      "name": "Operations",
+      "template": "operations-control",
+      "rooms": [
+        [
+          "director",
+          "Operations Director Office",
+          1,
+          "Director desk, issue review table"
+        ],
+        [
+          "control",
+          "Project Control Hall",
+          12,
+          "Monitoring screens, coordinator desks"
+        ],
+        [
+          "incident",
+          "Issue Resolution Room",
+          8,
+          "Response planning table, incident display"
+        ],
+        [
+          "dispatch",
+          "Scheduling and Dispatch",
+          6,
+          "Task board, planning stations"
+        ]
+      ],
+      "staff": [
+        "Operations Director",
+        "Project Coordinator",
+        "Workflow Coordinator",
+        "Issue Resolution Agent"
+      ]
+    },
+    {
+      "id": "finance-investment",
+      "name": "Finance & Investment",
+      "template": "financial-intelligence",
+      "rooms": [
+        [
+          "controller",
+          "Finance Controller Office",
+          1,
+          "Private finance workspace"
+        ],
+        [
+          "analysts",
+          "Analyst Studio",
+          10,
+          "Multi-monitor analyst desks"
+        ],
+        [
+          "investment",
+          "Confidential Investment Review",
+          8,
+          "Private discussion table"
+        ],
+        [
+          "forecast",
+          "Forecast and Dashboard Wall",
+          6,
+          "Cashflow and scenario displays"
+        ]
+      ],
+      "staff": [
+        "Finance Controller",
+        "Investment Analyst",
+        "Budgeting Agent"
+      ]
+    },
+    {
+      "id": "software-research",
+      "name": "Software Development & Research",
+      "template": "engineering-studio",
+      "rooms": [
+        [
+          "director",
+          "Software Director Office",
+          1,
+          "Architecture review desk"
+        ],
+        [
+          "developer",
+          "Developer Bench",
+          12,
+          "Dual-monitor coding desks"
+        ],
+        [
+          "architecture",
+          "Architecture Workshop",
+          8,
+          "Whiteboards, collaborative layout table"
+        ],
+        [
+          "research",
+          "Research Lab",
+          8,
+          "Prototype workstations"
+        ]
+      ],
+      "staff": [
+        "Software Director",
+        "Codex Developer",
+        "Solution Architect",
+        "Research Agent"
+      ]
+    },
+    {
+      "id": "qa-test",
+      "name": "QA & Technical Test Division",
+      "template": "qa-laboratory",
+      "rooms": [
+        [
+          "qa-director",
+          "QA Director Office",
+          1,
+          "Review and approval desk"
+        ],
+        [
+          "automation",
+          "Automated Test Lab",
+          10,
+          "Test terminals and isolated rigs"
+        ],
+        [
+          "defects",
+          "Defect Investigation",
+          6,
+          "Investigation screens"
+        ],
+        [
+          "uat",
+          "UAT Review Room",
+          10,
+          "Acceptance validation bench"
+        ]
+      ],
+      "staff": [
+        "QA Director",
+        "Test Engineer",
+        "UAT Coordinator"
+      ]
+    },
+    {
+      "id": "governance-law",
+      "name": "Governance & Regulations Law of Malaysia",
+      "template": "compliance-suite",
+      "rooms": [
+        [
+          "director",
+          "Governance Director Office",
+          1,
+          "Private executive desk"
+        ],
+        [
+          "legal",
+          "Legal Research",
+          8,
+          "Reference library, review workstations"
+        ],
+        [
+          "consultation",
+          "Private Consultation",
+          6,
+          "Confidential meeting desk"
+        ],
+        [
+          "policy",
+          "Policy and Risk Review",
+          8,
+          "Policy board and risk registers"
+        ]
+      ],
+      "staff": [
+        "Governance Officer",
+        "Legal Researcher",
+        "Compliance Review Agent"
+      ]
+    },
+    {
+      "id": "meeting-hub",
+      "name": "Meeting Hub / Connecting Centre",
+      "template": "collaboration-hub",
+      "rooms": [
+        [
+          "conference",
+          "Group Conference Hall",
+          18,
+          "Video conference, long table"
+        ],
+        [
+          "booths",
+          "Discussion Booths",
+          6,
+          "Private sound-controlled meeting pods"
+        ],
+        [
+          "connections",
+          "Cross-Company Connecting Centre",
+          12,
+          "Shared coordination screens"
+        ],
+        [
+          "actions",
+          "Minutes and Action Tracking",
+          6,
+          "Follow-up coordination stations"
+        ]
+      ],
+      "staff": [
+        "Meeting Coordinator",
+        "Action Item Tracker"
+      ]
+    },
+    {
+      "id": "training-upgrade",
+      "name": "Trainings, Upgrade & Recruitment",
+      "template": "capability-campus",
+      "rooms": [
+        [
+          "training",
+          "Training Classroom",
+          18,
+          "Training benches and demo screens"
+        ],
+        [
+          "recruit",
+          "Recruitment and Onboarding",
+          8,
+          "Interview booths and setup stations"
+        ],
+        [
+          "abilities",
+          "Ability Configuration Lab",
+          6,
+          "Skills assessment terminals"
+        ],
+        [
+          "reviews",
+          "Upgrade and Lifecycle Review",
+          8,
+          "Controlled approval meeting space"
+        ]
+      ],
+      "staff": [
+        "Agent Trainer",
+        "Recruitment Agent",
+        "Capability Assessor"
+      ]
+    },
+    {
+      "id": "future-expansion",
+      "name": "Future Expansion",
+      "template": "modular-expansion",
+      "rooms": [
+        [
+          "company-plots",
+          "Future Company Bays",
+          0,
+          "Empty configurable expansion bays"
+        ],
+        [
+          "division-plots",
+          "Future Division Bays",
+          0,
+          "Empty configurable room templates"
+        ],
+        [
+          "floor-core",
+          "Additional Floor Provision",
+          0,
+          "Stair/elevator core reservation"
+        ]
+      ],
+      "staff": [
+        "Expansion Planner"
+      ]
+    }
+  ]
+}
