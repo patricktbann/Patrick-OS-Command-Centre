@@ -1,0 +1,5 @@
+# Local Codex SDK pilot output must never be committed
+codex-pilot-evidence.json
+codex-pilot-evidence-*.json
+__pycache__/
+*.pyc
