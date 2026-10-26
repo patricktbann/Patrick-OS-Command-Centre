@@ -29,6 +29,8 @@ jobs:
         run: node --test agent-runtime/*.test.mjs
       - name: Run real GitHub-hosted sandbox pilot
         run: node agent-runtime/run-pilot.mjs
+      - name: Verify sandbox evidence against GitHub runner context
+        run: node agent-runtime/verify-pilot-cli.mjs
       - name: Upload sandbox evidence
         if: always()
         uses: actions/upload-artifact@v4
