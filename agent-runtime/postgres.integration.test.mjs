@@ -89,3 +89,21 @@ after(async()=>{await pool.end()});
   assert.deepEqual(await store.reserve(ambiguous),{accepted:false});
   await assert.rejects(store.markStarted(ambiguous,{...start,runId:tag+'-bad-resume'}),e=>e.code==='INVALID_RESERVATION_STATE');
  });
+
+test('real PostgreSQL: independently verified recovery records single audit and blocks replay',async()=>{
+ const quarantined=tag+'-codex-recovery';
+ assert.deepEqual(await store.reserve(quarantined),{accepted:true});
+ assert.deepEqual(await store.markReconciliationRequired(quarantined,'timed_out'),{recorded:true});
+ const recovery={runId:tag+'-authentic-run-fixture',executorType:'codex-cloud',
+  repository:'patricktbann/Patrick-OS-Command-Centre',status:'running',
+  operatorId:'authorized-operator',reason:'server-verified-run'};
+ assert.deepEqual(await store.confirmReconciledRun(quarantined,recovery),{recorded:true});
+ const row=await pool.query('SELECT state,executor_run_id,executor_type FROM agent_task_dispatch WHERE task_id=$1',[quarantined]);
+ assert.deepEqual(row.rows[0],{state:'EXECUTING',executor_run_id:recovery.runId,executor_type:'codex-cloud'});
+ const audit=await pool.query('SELECT event_type FROM agent_dispatch_audit WHERE task_id=$1 ORDER BY event_id',[quarantined]);
+ assert.deepEqual(audit.rows.map(x=>x.event_type),['RESERVED','RECONCILIATION_REQUIRED','RECONCILED_RUN']);
+ await assert.rejects(store.confirmReconciledRun(quarantined,{...recovery,runId:tag+'-duplicate'}),e=>e.code==='INVALID_RECONCILIATION_STATE');
+ assert.deepEqual(await store.reserve(quarantined),{accepted:false});
+ const count=await pool.query('SELECT count(*)::integer AS n FROM agent_dispatch_audit WHERE task_id=$1',[quarantined]);
+ assert.equal(count.rows[0].n,3);
+});
