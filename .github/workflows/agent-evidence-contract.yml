@@ -1,0 +1,41 @@
+name: Agent evidence contract
+on:
+  pull_request:
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  push:
+    branches:
+      - 'feature/v3.5-agent-evidence-state-machine'
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-contract:
+    name: Verify AI agent task evidence rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run evidence state machine tests
+        run: node --test agent-runtime/*.test.mjs
+      - name: Run real GitHub-hosted sandbox pilot
+        run: node agent-runtime/run-pilot.mjs
+      - name: Verify sandbox evidence against GitHub runner context
+        run: node agent-runtime/verify-pilot-cli.mjs
+      - name: Upload sandbox evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsy-agent-sandbox-pr-evidence
+          path: agent-runtime/artifacts/pilot-evidence.json
+          retention-days: 7
+          if-no-files-found: warn
