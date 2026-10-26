@@ -13,7 +13,7 @@ const output={verified:true,taskId:task.taskId,executorRunId:run.executorRunId,
  commitSha:'a'.repeat(40),pullRequestUrl:'https://github.com/patricktbann/Patrick-OS-Command-Centre/pull/3'};
 const qa={verified:true,taskId:task.taskId,reviewedAt:'2026-10-26T02:15:00Z',
  reviewerId:'brain-qa',passed:true,testResults:[{name:'Unit tests',passed:true}]};
-const approval={verified:true,taskId:task.taskId,approver:'Patrick',explicit:true,approvedAt:'2026-10-26T02:20:00Z'};
+const approval={verified:true,taskId:task.taskId,approver:'Patrick',authenticatedPrincipalId:'patrick-approved-account',explicit:true,approvedAt:'2026-10-26T02:20:00Z'};
 const state=e=>deriveTaskStatus(task,e).state;
 test('valid task contract',()=>assert.equal(validateAssignment(task).ok,true));
 test('malformed or incomplete tasks blocked',()=>{
@@ -42,4 +42,15 @@ test('complete only after verified entire chain',()=>assert.equal(state({issue,r
 test('snapshot never invents missing executor data',()=>{
  const s=makeEvidenceSnapshot(task,{issue});
  assert.equal(s.executorRunId,null);assert.equal(s.pullRequestUrl,null);assert.equal(s.actionRequired,true);
+});
+
+test('repository mismatch cannot grant GitHub assignment',()=>{
+ assert.equal(state({issue:{...issue,url:'https://github.com/unrelated/repo/issues/2'}}),STATES.DRAFT);
+});
+test('repository mismatch cannot grant code-output readiness',()=>{
+ assert.equal(state({issue,run,output:{...output,pullRequestUrl:'https://github.com/unrelated/repo/pull/3'}}),STATES.EXECUTING);
+});
+test('approval requires an authenticated principal identifier',()=>{
+ const wrong={...approval,authenticatedPrincipalId:undefined};
+ assert.equal(state({issue,run,output,qa,approval:wrong}),STATES.UAT_PENDING);
 });
