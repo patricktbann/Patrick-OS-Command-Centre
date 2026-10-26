@@ -101,3 +101,11 @@ The verifier generates canonical fields from those services; browser-supplied `a
 - `dispatchApprovedTask` currently preserves ambiguous reservations for reconciliation but does not mark `RECONCILIATION_REQUIRED` durably; add a recovery process and audit before live use.
 - A real Codex executor must return an independently verifiable task/run identifier; a GitHub Actions test ID is not Codex evidence.
 - No secrets, live services or paid subscriptions should be activated from this draft PR. Patrick approval is required for deployment and any production migration.
+
+## Codex executor adapter (V3.5, draft)
+
+`codex-executor.mjs` is a **server-only fail-closed adapter**, not a Codex Cloud service integration. An authorized backend must inject two independently trusted capabilities: `connection.getServerAuthorization()` and `transport.createTask()/readTask()`. The adapter checks allowlisted scope and requires an explicit provider-reported `providerRunId`, task ID and repository match. A browser cannot invent these as authorization.
+
+**Critical security boundary:** the injected transport itself MUST be an officially supported, independently authenticated Codex execution channel. The returned object fields `provider: 'codex-cloud'`, `accepted: true`, and `verifiedTransportResponse` are internal contract labels and are NOT cryptographic proof or independent attestation by OpenAI. A malicious/incorrect transport could supply matching fake values. The production implementation must validate authenticated transport response provenance, authorize the connected account, enforce usage/plan limits and separately verify run/result and GitHub PR evidence. No undocumented Codex API endpoint or paid API key is assumed here.
+
+Until a supported transport is available in this environment, real Codex Cloud submission, polling and authenticated run ID remain **BLOCKED**. The tests use local fixture transports only. No production branch write, migration, secrets, paid service or deployment has been authorized.
