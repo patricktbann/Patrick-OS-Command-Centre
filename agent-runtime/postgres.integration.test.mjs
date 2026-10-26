@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
 import {createPostgresReservationStore} from './postgres-store.mjs';
+import {createPostgresApprovals} from './postgres-approvals.mjs';
+import {taskDigest} from './task-digest.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
 for(const k of required)if(!process.env[k])throw new Error('Disposable Postgres test environment missing '+k);
@@ -14,7 +16,8 @@ const pool=new pg.Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT),
  user:process.env.PGUSER,password:process.env.PGPASSWORD,database:process.env.PGDATABASE,max:20,
  connectionTimeoutMillis:5000});
 const schema=await readFile(new URL('./sql/001-agent-dispatch.sql',import.meta.url),'utf8');
-try{await pool.query(schema)}catch(e){await pool.end();throw e}
+const approvalSchema=await readFile(new URL('./sql/002-agent-approvals.sql',import.meta.url),'utf8');
+try{await pool.query(schema);await pool.query(approvalSchema)}catch(e){await pool.end();throw e}
 const store=createPostgresReservationStore(pool);
 const tag='it-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;
 const taskId=tag+'-concurrent';
@@ -106,4 +109,27 @@ test('real PostgreSQL: independently verified recovery records single audit and 
  assert.deepEqual(await store.reserve(quarantined),{accepted:false});
  const count=await pool.query('SELECT count(*)::integer AS n FROM agent_dispatch_audit WHERE task_id=$1',[quarantined]);
  assert.equal(count.rows[0].n,3);
+});
+
+test('real PostgreSQL: task-specific approval is auditable, revocable and not reusable',async()=>{
+ const approvals=createPostgresApprovals(pool);
+ const task={taskId:tag+'-approval',agentId:'TSY-A0001',repository:'patricktbann/Patrick-OS-Command-Centre',
+ companyId:'TSY-GROUP',divisionId:'software',objective:'review task',acceptanceCriteria:'tests'};
+ const approvalId=tag+'-approval-record',principalId='patrick-id';
+ const created=await approvals.approve({approvalId,task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()});
+ assert.equal(created.taskDigest,taskDigest(task));
+ const decision=await approvals.findApprovedDecision(task.taskId,principalId);
+ assert.equal(decision.taskDigest,taskDigest(task));assert.equal(decision.status,'APPROVED');
+ assert.notEqual(decision.taskDigest,taskDigest({...task,objective:'modified'}));
+ await assert.rejects(approvals.approve({approvalId:tag+'-duplicate',task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()}),e=>e.code==='APPROVAL_ALREADY_EXISTS');
+ assert.deepEqual(await approvals.revoke({approvalId,principalId,principalAuthenticated:true}),{approvalId,status:'REVOKED'});
+ assert.equal(await approvals.findApprovedDecision(task.taskId,principalId),null);
+ const audit=await pool.query('SELECT event_type FROM agent_approval_audit WHERE approval_id=$1 ORDER BY event_id',[approvalId]);
+ assert.deepEqual(audit.rows.map(x=>x.event_type),['APPROVED','REVOKED']);
+});
+test('real PostgreSQL: unauthenticated approval never reaches storage',async()=>{
+ const approvals=createPostgresApprovals(pool);
+ await assert.rejects(approvals.approve({approvalId:tag+'-not-approved',task:{taskId:tag+'-no-task',repository:'x/y'},principalId:'patrick-id',principalAuthenticated:false,approvedAt:new Date().toISOString()}),e=>e.code==='UNAUTHORIZED_APPROVAL');
+ const r=await pool.query('SELECT count(*)::integer AS n FROM agent_task_approval WHERE approval_id=$1',[tag+'-not-approved']);
+ assert.equal(r.rows[0].n,0);
 });

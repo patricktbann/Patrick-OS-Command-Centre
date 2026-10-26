@@ -5,6 +5,7 @@
  */
 import {isDeepStrictEqual} from 'node:util';
 import {DispatchError} from './dispatch.mjs';
+import {taskDigest} from './task-digest.mjs';
 const ID=/^[A-Za-z0-9][\w.:-]{1,119}$/;
 const validId=s=>typeof s==='string'&&ID.test(s);
 function deny(code,detail){throw new DispatchError(code,detail)}
@@ -36,6 +37,7 @@ export function createTrustedVerifier({identity,registry,approvals,github,policy
    const decision=await approvals.findApprovedDecision(stored.taskId,policy.principalId);
    if(!decision||decision.status!=='APPROVED'||decision.taskId!==stored.taskId||
       decision.principalId!==policy.principalId||!validId(decision.approvalId)||
+      decision.taskDigest!==taskDigest(stored)||
       !Number.isFinite(Date.parse(decision.approvedAt))||
       (decision.repository&&decision.repository!==stored.repository))
      deny('APPROVAL_MISSING','No recorded principal approval for this task');
