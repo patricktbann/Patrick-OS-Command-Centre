@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTrustedVerifier,bindTrustedDispatch} from './trusted-verifier.mjs';
 import {dispatchApprovedTask} from './dispatch.mjs';
+import {taskDigest} from './task-digest.mjs';
 const task={taskId:'TSY-T-901',agentId:'TSY-A0001',companyId:'TSY-GROUP',divisionId:'software',
  objective:'Safe test task',acceptanceCriteria:'Tests passed',repository:'patricktbann/Patrick-OS-Command-Centre',
  allowedActions:['read-repo','run-tests'],approvalRequired:true};
@@ -10,7 +11,7 @@ const session={serverValidated:true,opaque:'server-session'};
 function services(override={}){
  const state={identity:{authenticate:async()=>({subject:'approved-operator',authenticated:true})},
  registry:{loadAssignment:async()=>structuredClone(task),canDispatch:async()=>true},
- approvals:{findApprovedDecision:async()=>({status:'APPROVED',taskId:task.taskId,principalId:policy.principalId,approvalId:'decision-01',approvedAt:'2026-10-26T05:00:00Z',repository:task.repository})},
+ approvals:{findApprovedDecision:async()=>({status:'APPROVED',taskId:task.taskId,principalId:policy.principalId,approvalId:'decision-01',taskDigest:taskDigest(task),approvedAt:'2026-10-26T05:00:00Z',repository:task.repository})},
  github:{verifyIssue:async()=>({valid:true,taskId:task.taskId,agentId:task.agentId,repository:task.repository,number:4})}};
  return {...state,policy,...override};
 }
@@ -66,4 +67,15 @@ test('denied identity never reaches mock executor',async()=>{
  store:{reserve:async()=>{count++;return {accepted:true}},markStarted:async()=>{}},
  executor:{start:async()=>{count++;return {accepted:true}}}}),'UNAUTHENTICATED');
  assert.equal(count,0);
+});
+
+test('same task ID with different approved scope digest is denied',async()=>{
+ const bad={...task,objective:'Changed by another actor'};
+ const v=createTrustedVerifier(services({registry:{loadAssignment:async()=>bad,canDispatch:async()=>true}}));
+ const changed={...request,task:bad};
+ await expectDenied(v(changed,session),'APPROVAL_MISSING');
+});
+test('missing canonical approval digest is denied',async()=>{
+ const v=createTrustedVerifier(services({approvals:{findApprovedDecision:async()=>({status:'APPROVED',taskId:task.taskId,principalId:policy.principalId,approvalId:'decision-01',approvedAt:'2026-10-26T05:00:00Z',repository:task.repository})}}));
+ await expectDenied(v(request,session),'APPROVAL_MISSING');
 });
