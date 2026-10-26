@@ -45,7 +45,25 @@ export function createPostgresReservationStore(pool){
     return {recorded:true};
    });
   },
-  async markStarted(taskId,data){
+  async confirmReconciledRun(taskId,data){
+   if(!validId(taskId)||!validId(data?.runId)||data?.executorType!=='codex-cloud'||
+      !validId(data?.operatorId)||typeof data?.reason!=='string'||!data.reason.trim()||
+      typeof data?.repository!=='string'||!data.repository.trim())
+    throw new DispatchError('INVALID_RECOVERY_EVIDENCE','Incomplete server-verified recovery record');
+   return transaction(pool,async client=>{
+    const row=await client.query(
+     "UPDATE agent_task_dispatch SET state='EXECUTING',executor_run_id=$2,executor_type=$3,updated_at=now() WHERE task_id=$1 AND state='RECONCILIATION_REQUIRED' AND executor_run_id IS NULL RETURNING task_id",
+     [taskId,data.runId,data.executorType]);
+    if(row.rowCount!==1)
+     throw new DispatchError('INVALID_RECONCILIATION_STATE','Task must be quarantined and have no assigned run');
+    await client.query(
+     "INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'RECONCILED_RUN',$2::jsonb)",
+     [taskId,JSON.stringify({runId:data.runId,executorType:data.executorType,
+       repository:data.repository,status:data.status,operatorId:data.operatorId,reason:data.reason.slice(0,160)})]);
+    return {recorded:true};
+   });
+  },
+    async markStarted(taskId,data){
    if(!validId(taskId)||!validId(data?.runId)||!validId(data?.executorType)||!validId(data?.approvalId))
     throw new DispatchError('INVALID_RUN_EVIDENCE','Missing valid started-run identifiers');
    if(!Number.isFinite(Date.parse(data.startedAt)))
