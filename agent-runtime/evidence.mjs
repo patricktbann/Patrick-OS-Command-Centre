@@ -14,6 +14,8 @@ const url=x=>typeof x==='string'&&/^https:\/\/github\.com\/[^/]+\/[^/]+\/(issues
 const sha=x=>typeof x==='string'&&/^[a-fA-F0-9]{40}$/.test(x);
 const date=x=>typeof x==='string'&&Number.isFinite(Date.parse(x));
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+// IMPORTANT: this module is pure display / policy logic. Trust assertions must originate from an authenticated server, NEVER from a public page.
+export const TRUST_BOUNDARY='trusted-server-only';
 export function validateAssignment(task){
   const errors=[];
   if(!task||typeof task!=='object')return {ok:false,errors:['Missing task']};
@@ -27,11 +29,11 @@ export function validateAssignment(task){
   if(task.approvalRequired!==true&&task.approvalRequired!==false)errors.push('Explicit approvalRequired boolean needed');
   return {ok:errors.length===0,errors};
 }
-function validIssue(e,t){return !!(e?.verified===true&&id(e.taskId)&&e.taskId===t.taskId&&e.agentId===t.agentId&&url(e.url)&&Number.isSafeInteger(e.number)&&e.number>0&&date(e.checkedAt))}
+function validIssue(e,t){return !!(e?.verified===true&&id(e.taskId)&&e.taskId===t.taskId&&e.agentId===t.agentId&&url(e.url)&&e.url.includes('/'+t.repository+'/issues/')&&Number.isSafeInteger(e.number)&&e.number>0&&e.url.endsWith('/issues/'+e.number)&&date(e.checkedAt))}
 function validRun(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&e.agentId===t.agentId&&id(e.executorRunId)&&id(e.executorType)&&date(e.startedAt)&&e.started===true)}
-function validOutput(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&sha(e.commitSha)&&url(e.pullRequestUrl)&&id(e.executorRunId))}
+function validOutput(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&sha(e.commitSha)&&url(e.pullRequestUrl)&&e.pullRequestUrl.includes('/'+t.repository+'/pull/')&&id(e.executorRunId))}
 function validQa(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&date(e.reviewedAt)&&id(e.reviewerId)&&Array.isArray(e.testResults)&&e.testResults.length>0&&e.testResults.every(x=>typeof x.name==='string'&&typeof x.passed==='boolean'))}
-function validApproval(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&e.approver==='Patrick'&&date(e.approvedAt)&&e.explicit===true)}
+function validApproval(e,t){return !!(e?.verified===true&&e.taskId===t.taskId&&e.approver==='Patrick'&&date(e.approvedAt)&&e.explicit===true&&id(e.authenticatedPrincipalId))}
 export function deriveTaskStatus(task,evidence={}){
   const valid=validateAssignment(task);
   if(!valid.ok)return {state:STATES.BLOCKED,reason:valid.errors.join('; ')};
