@@ -26,10 +26,10 @@ CREATE TABLE IF NOT EXISTS tsy_agent_dispatches (
  state text NOT NULL CHECK(state IN ('reserved','started','reconciliation_required')),
  run_id text,
  executor_type text,
- approval_id text NOT NULL REFERENCES tsy_agent_approvals(approval_id),
+ approval_id text REFERENCES tsy_agent_approvals(approval_id),
  reserved_at timestamptz NOT NULL DEFAULT now(),
  started_at timestamptz,
- CHECK((state <> 'started') OR (run_id IS NOT NULL AND executor_type IS NOT NULL))
+ CHECK((state <> 'started') OR (run_id IS NOT NULL AND executor_type IS NOT NULL AND approval_id IS NOT NULL))
 );
 CREATE TABLE IF NOT EXISTS tsy_agent_events (
  event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
