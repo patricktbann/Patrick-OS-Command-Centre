@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSY Group AI Office · V3.5 Execution Control</title>
+<style>
+:root{color-scheme:dark;font:15px/1.6 system-ui,-apple-system,Segoe UI,sans-serif;background:#08111d;color:#e8f0f7}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -15%,#28455b 0,transparent 40%),#08111d}
+header,main,footer{max-width:1180px;margin:auto;padding:22px 24px}
+header{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;border-bottom:1px solid #304151}
+.logo{font-size:14px;letter-spacing:1.6px;font-weight:800;color:#d4c7a9;text-transform:uppercase}
+a{color:#a6d6f9;text-decoration:none}a:hover{text-decoration:underline}
+nav{display:flex;gap:16px;flex-wrap:wrap}.eyebrow{color:#d0bc96;font-size:12px;font-weight:700;letter-spacing:2px}
+h1{font-size:clamp(26px,4.6vw,44px);line-height:1.15;margin:12px 0}h2{font-size:18px;margin:0 0 12px}
+.lead{max-width:750px;color:#b9cddd}.pills{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0}
+.pill{border:1px solid #496171;background:#142533;border-radius:24px;padding:7px 13px;font-size:13px}
+.pill.warn{border-color:#836a46;color:#f4d297}.pill.good{border-color:#376f60;color:#a6e6cb}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{border:1px solid #30475a;border-radius:14px;background:#102031;padding:19px;min-width:0}
+.card p{color:#b1c7d5;margin:6px 0 12px}.metric{font-size:31px;font-weight:800;color:#f2efdf}.wide{grid-column:span 2}
+ul{padding-left:21px}.status{font-weight:700}.muted{color:#acc4d5}.list{list-style:none;padding:0;margin:0}
+.list li{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #2a3d4d;flex-wrap:wrap}
+small{color:#a9bcca}.footnote{font-size:13px;color:#b1c6d2}button{background:#d8c8a9;color:#111e2a;border:0;border-radius:8px;padding:10px 17px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}footer{border-top:1px solid #304151;color:#b8c9d2;font-size:13px}
+@media(max-width:770px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}header,main,footer{padding:19px 15px}}
+</style></head><body>
+<header><div class="logo">TSY GROUP · AI OFFICE</div><nav>
+<a href="./tsy-group-office-v3-4-visual-preview.html">V3.4 Frozen Office</a>
+<a href="./tsy-group-agent-intelligence-v3-5-1-preview.html">V3.5 Agent Desk</a>
+<a href="./">Command Centre</a></nav></header>
+<main>
+<div class="eyebrow">DEPLOYED PREVIEW · READ ONLY · V3.5 ENGINEERING CONTROL</div>
+<h1>AI workforce execution control</h1>
+<p class="lead">A public-safe, live GitHub evidence view for Patrick OS. Pull requests and CI are real data; this panel does not start Codex, approve assignments, access private systems or represent a production backend.</p>
+<div class="pills"><span class="pill good">GitHub repository connected</span><span class="pill warn">Codex live transport: not connected</span><span class="pill">V3.4 baseline: unchanged</span></div>
+<div class="grid">
+<section class="card"><h2>Engineering source</h2><div class="metric">GitHub</div><p>Public repository and independently accessible PR/CI evidence.</p><a href="https://github.com/patricktbann/Patrick-OS-Command-Centre">View repository</a></section>
+<section class="card"><h2>Production Codex</h2><div class="metric">Not live</div><p>Authenticated SDK pilot exists in draft PR #14. No authorized live run verified here.</p><a href="https://github.com/patricktbann/Patrick-OS-Command-Centre/pull/14">View SDK pilot</a></section>
+<section class="card"><h2>Production approvals</h2><div class="metric">Not live</div><p>Task-bound security controls passed isolated tests; no production identity service deployed.</p><a href="https://github.com/patricktbann/Patrick-OS-Command-Centre/pull/13">Review approval gateway</a></section>
+<section class="card wide"><h2>Draft implementation chain · Live GitHub read</h2>
+<p class="footnote" id="fetch-state" aria-live="polite">Fetching public GitHub records…</p>
+<ul class="list" id="pulls"><li>Use the GitHub links below if live API access is restricted.</li></ul>
+<button type="button" id="refresh">Refresh GitHub evidence</button>
+</section>
+<section class="card"><h2>Release gates</h2><ul><li>Authenticated Codex SDK run and real thread evidence</li><li>Server-based login and approval integration</li><li>Database deployment approval and security review</li><li>End-to-end Patrick UAT</li></ul><p class="footnote">None are marked complete by this public page.</p></section>
+<section class="card wide"><h2>Read-only execution evidence</h2><p>CI status from GitHub Actions is not equivalent to autonomous AI execution. All task assignments, approval decisions and agent intelligence controls remain separate from this public monitoring preview.</p><div id="runs" class="muted">Checking latest public workflow result…</div></section>
+<section class="card"><h2>Frozen release</h2><p>V3.4 stays the approved visual HQ. This new page only adds a preview surface and does not overwrite that release.</p><a href="./tsy-group-office-v3-4-visual-preview.html">Open V3.4 baseline</a></section>
+</div></main>
+<footer>TSY Group · Patrick OS · Public GitHub evidence viewer · No authentication credentials stored · No execution controls</footer>
+<script>
+'use strict';
+const owner='patricktbann',repo='Patrick-OS-Command-Centre';
+const api='https://api.github.com/repos/'+owner+'/'+repo;
+const prs=[3,5,7,8,9,10,11,12,13,14];
+const $=id=>document.getElementById(id);
+async function get(path){
+ const c=new AbortController();const timer=setTimeout(()=>c.abort(),9000);
+ try{const r=await fetch(api+path,{headers:{Accept:'application/vnd.github+json'},signal:c.signal,cache:'no-store'});if(!r.ok)throw Error('GitHub returned HTTP '+r.status);return await r.json()}
+ finally{clearTimeout(timer)}
+}
+function item(container,number,detail,state){
+ const li=document.createElement('li'),link=document.createElement('a');
+ link.href='https://github.com/'+owner+'/'+repo+'/pull/'+number;link.textContent='PR #'+number+' · '+detail;
+ link.target='_blank';link.rel='noopener noreferrer';
+ const label=document.createElement('small');label.textContent=state;li.append(link,label);container.append(li)
+}
+async function refresh(){
+ const btn=$('refresh');btn.disabled=true;$('fetch-state').textContent='Checking public GitHub API…';
+ $('pulls').replaceChildren();$('runs').textContent='Checking latest public workflow result…';
+ try{
+  const results=await Promise.allSettled(prs.map(n=>get('/pulls/'+n)));
+  let success=0;
+  results.forEach((r,i)=>{if(r.status==='fulfilled'){success++;const v=r.value;item($('pulls'),prs[i],v.title,(v.draft?'DRAFT · ':'')+(v.merged?'MERGED':v.state.toUpperCase()))}
+     else item($('pulls'),prs[i],'Open GitHub pull request','Live lookup unavailable')});
+  $('fetch-state').textContent=success+' of '+prs.length+' PR records refreshed from GitHub. The branch stack must still pass release approval.';
+ }catch(e){$('fetch-state').textContent='GitHub data temporarily unavailable; direct PR links remain active.'}
+ try{
+   const d=await get('/actions/workflows/agent-evidence-contract.yml/runs?per_page=1');
+   const v=d.workflow_runs?.[0];
+   $('runs').textContent=v?'Latest workflow run #'+v.id+' · '+(v.conclusion||v.status)+' · '+(v.head_branch||'unknown branch'):'No GitHub Actions runs returned.';
+ }catch(e){$('runs').textContent='Workflow API unavailable; review Actions directly on GitHub.'}
+ btn.disabled=false;
+}
+$('refresh').addEventListener('click',refresh);refresh();
+</script></body></html>
