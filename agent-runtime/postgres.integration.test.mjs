@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
@@ -20,7 +20,7 @@ const tag='it-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;
 const taskId=tag+'-concurrent';
 const start={runId:tag+'-run',executorType:'github-actions-test',approvalId:tag+'-approval',
  startedAt:new Date().toISOString()};
-try{
+after(async()=>{await pool.end()});
  test('real PostgreSQL: twenty concurrent reservations permit exactly one dispatch',async()=>{
   const results=await Promise.all(Array.from({length:20},()=>store.reserve(taskId)));
   assert.equal(results.filter(x=>x.accepted).length,1);
@@ -58,6 +58,3 @@ try{
   const row=await pool.query('SELECT state FROM agent_task_dispatch WHERE task_id=$1',[other]);
   assert.equal(row.rows[0].state,'RESERVED');
  });
-}finally{
- process.on('beforeExit',()=>{if(!pool.ended)void pool.end()});
-}
