@@ -81,3 +81,10 @@ test('server verifier denial causes no reservation or execution',async()=>{
   executor:{start:async()=>{touched=true}}}),e=>e.code==='IDENTITY_DENIED');
  assert.equal(touched,false);
 });
+
+test('unversioned canonical assignment cannot inherit missing revision approval',async()=>{
+ const unversioned={...task,revision:undefined};
+ const {verify}=setup({registry:{getTask:async()=>structuredClone(unversioned)},
+  approvalStore:{getApproval:async()=>({...approval,assignmentRevision:undefined})}});
+ await assert.rejects(verify({...input,task:unversioned}),e=>e.code==='UNKNOWN_TASK');
+});
