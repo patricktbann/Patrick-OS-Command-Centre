@@ -39,8 +39,9 @@ export function makeServerDispatchVerifier({session,registry,approvalStore,githu
       typeof actor.subject!=='string'||!actor.subject)
      fail('IDENTITY_DENIED','Authenticated authorized dispatcher required');
    const persisted=await registry.getTask(taskId);
-   if(!persisted||!validateAssignment(persisted).ok)
-     fail('UNKNOWN_TASK','Canonical assignment missing or invalid');
+   if(!persisted||!validateAssignment(persisted).ok||
+      typeof persisted.revision!=='string'||!persisted.revision.trim())
+     fail('UNKNOWN_TASK','Canonical assignment missing, unversioned or invalid');
    if(!isDeepStrictEqual(untrusted.task,persisted))
      fail('SCOPE_MISMATCH','Request does not match persisted approved assignment');
    const approval=await approvalStore.getApproval(taskId);
