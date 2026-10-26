@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run evidence state machine tests
-        run: node --test agent-runtime/*.test.mjs
+        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs
       - name: Run real GitHub-hosted sandbox pilot
         run: node agent-runtime/run-pilot.mjs
       - name: Verify sandbox evidence against GitHub runner context
@@ -71,5 +71,13 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable PostgreSQL test driver
+        run: npm install --no-save --no-package-lock pg@8
       - name: Verify PostgreSQL reservation concurrency and rollback
         run: bash agent-runtime/sql/integration-test.sh
+      - name: Exercise actual reservation adapter against PostgreSQL
+        run: node --test agent-runtime/postgres.integration.test.mjs
