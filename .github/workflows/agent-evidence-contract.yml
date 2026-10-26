@@ -26,4 +26,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run evidence state machine tests
-        run: node --test agent-runtime/evidence.test.mjs
+        run: node --test agent-runtime/*.test.mjs
