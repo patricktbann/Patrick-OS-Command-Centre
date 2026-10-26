@@ -75,3 +75,17 @@ after(async()=>{await pool.end()});
   const events=await pool.query('SELECT event_id FROM agent_dispatch_audit WHERE task_id=$1',[other]);
   assert.equal(events.rows.length,0);
  });
+
+ test('real PostgreSQL: ambiguous dispatch is durably quarantined and audited',async()=>{
+  const ambiguous=tag+'-uncertain';
+  assert.deepEqual(await store.reserve(ambiguous),{accepted:true});
+  assert.deepEqual(await store.markReconciliationRequired(ambiguous,'executor_timeout'),{recorded:true});
+  const row=await pool.query('SELECT state,executor_run_id FROM agent_task_dispatch WHERE task_id=$1',[ambiguous]);
+  assert.equal(row.rows[0].state,'RECONCILIATION_REQUIRED');
+  assert.equal(row.rows[0].executor_run_id,null);
+  const audit=await pool.query('SELECT event_type,details FROM agent_dispatch_audit WHERE task_id=$1 ORDER BY event_id',[ambiguous]);
+  assert.deepEqual(audit.rows.map(x=>x.event_type),['RESERVED','RECONCILIATION_REQUIRED']);
+  assert.equal(audit.rows[1].details.reason,'executor_timeout');
+  assert.deepEqual(await store.reserve(ambiguous),{accepted:false});
+  await assert.rejects(store.markStarted(ambiguous,{...start,runId:tag+'-bad-resume'}),e=>e.code==='INVALID_RESERVATION_STATE');
+ });
