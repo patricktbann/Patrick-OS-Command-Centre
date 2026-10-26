@@ -9,13 +9,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
 from datetime import datetime, timezone
 
 EXPECTED_REPOSITORY = "patricktbann/Patrick-OS-Command-Centre"
-BASELINE = "feature/v3.5-official-codex-sdk-readonly-pilot"
 DEFAULT_TASK = (
     "Read only: inspect the V3.5 agent-runtime and produce a security review. "
     "Do not modify files, create commits, push, deploy, merge or invoke external services. "
@@ -37,7 +37,7 @@ def preflight(root: Path) -> dict:
     if git("-C", str(root), "status", "--porcelain"):
         raise RuntimeError("Working tree must be clean before Codex session")
     origin = git("-C", str(root), "remote", "get-url", "origin")
-    if EXPECTED_REPOSITORY not in origin:
+    if not re.fullmatch(r"(?:https://github\\.com/|git@github\\.com:|ssh://git@github\\.com/)patricktbann/Patrick-OS-Command-Centre(?:\\.git)?", origin):
         raise RuntimeError("Wrong GitHub origin")
     return {"repository":EXPECTED_REPOSITORY,"branch":branch,
             "headSha":git("-C",str(root),"rev-parse","HEAD")}
@@ -62,7 +62,7 @@ def main() -> int:
         raise RuntimeError("Install official SDK with: python -m pip install openai-codex") from e
     with Codex() as codex:
         # SDK reuses already authenticated account; no automatic authorization.
-        thread=codex.thread_start(sandbox=Sandbox.read_only)
+        thread=codex.thread_start(cwd=str(root),sandbox=Sandbox.read_only)
         result=thread.run(DEFAULT_TASK)
         evidence={
             "schemaVersion":"3.5-official-sdk-pilot-1",
