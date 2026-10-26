@@ -51,10 +51,15 @@ after(async()=>{await pool.end()});
  });
  test('real PostgreSQL: transaction failure does not create a dispatch record',async()=>{
   const other=tag+'-rollback';
-  await store.reserve(other);
   const client=await pool.connect();
-  try{await client.query('BEGIN');await client.query('DELETE FROM agent_task_dispatch WHERE task_id=$1',[other]);await client.query('ROLLBACK')}
-  finally{client.release()}
+  try{
+   await client.query('BEGIN');
+   await client.query("INSERT INTO agent_task_dispatch(task_id,state) VALUES($1,'RESERVED')",[other]);
+   await assert.rejects(client.query('SELECT 1/0'),e=>e.code==='22012');
+   await client.query('ROLLBACK');
+  }finally{client.release()}
   const row=await pool.query('SELECT state FROM agent_task_dispatch WHERE task_id=$1',[other]);
-  assert.equal(row.rows[0].state,'RESERVED');
+  assert.equal(row.rows.length,0);
+  const events=await pool.query('SELECT event_id FROM agent_dispatch_audit WHERE task_id=$1',[other]);
+  assert.equal(events.rows.length,0);
  });
