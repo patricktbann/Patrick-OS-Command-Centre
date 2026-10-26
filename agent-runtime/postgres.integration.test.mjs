@@ -6,8 +6,8 @@ import {createPostgresReservationStore} from './postgres-store.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
 for(const k of required)if(!process.env[k])throw new Error('Disposable Postgres test environment missing '+k);
-if(process.env.GITHUB_ACTIONS!=='true'||process.env.PGHOST!=='127.0.0.1'||
-   process.env.PGDATABASE!=='tsy_agent_integration_test')
+if(process.env.GITHUB_ACTIONS!=='true'||!['127.0.0.1','localhost'].includes(process.env.PGHOST)||
+   process.env.PGDATABASE!=='tsy_agents_ci'||process.env.TSY_EPHEMERAL_CI_DB!=='yes')
  throw new Error('Refusing database integration tests outside isolated GitHub Actions Postgres service');
 
 const pool=new pg.Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT),
