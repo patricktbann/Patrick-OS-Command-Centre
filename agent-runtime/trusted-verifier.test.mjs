@@ -12,7 +12,7 @@ function services(override={}){
  registry:{loadAssignment:async()=>structuredClone(task),canDispatch:async()=>true},
  approvals:{findApprovedDecision:async()=>({status:'APPROVED',taskId:task.taskId,principalId:policy.principalId,approvalId:'decision-01',approvedAt:'2026-10-26T05:00:00Z',repository:task.repository})},
  github:{verifyIssue:async()=>({valid:true,taskId:task.taskId,agentId:task.agentId,repository:task.repository,number:4})}};
- return {...state,...override,policy};
+ return {...state,policy,...override};
 }
 const request={task:structuredClone(task),idempotencyKey:task.taskId,
  actor:{authenticated:true,subject:'attacker',canDispatch:true},
