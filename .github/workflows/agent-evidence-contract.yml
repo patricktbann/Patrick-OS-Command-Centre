@@ -39,3 +39,37 @@ jobs:
           path: agent-runtime/artifacts/pilot-evidence.json
           retention-days: 7
           if-no-files-found: warn
+  postgres-integration:
+    name: Ephemeral PostgreSQL reservation and audit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tsy_ci
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: tsy_agents_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tsy_ci -d tsy_agents_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: tsy_ci
+      PGPASSWORD: disposable_ci_only
+      PGDATABASE: tsy_agents_ci
+      TSY_EPHEMERAL_CI_DB: yes
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+      - name: Verify PostgreSQL reservation concurrency and rollback
+        run: bash agent-runtime/sql/integration-test.sh
