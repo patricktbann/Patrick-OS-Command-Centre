@@ -49,6 +49,18 @@ after(async()=>{await pool.end()});
   const row=await pool.query('SELECT count(*)::integer AS count FROM agent_dispatch_audit WHERE task_id=$1',[missing]);
   assert.equal(row.rows[0].count,0);
  });
+ test('real PostgreSQL: executor run ID uniqueness is enforced across tasks',async()=>{
+  const first=tag+'-unique-a',second=tag+'-unique-b',runId=tag+'-unique-run';
+  assert.deepEqual(await store.reserve(first),{accepted:true});
+  assert.deepEqual(await store.reserve(second),{accepted:true});
+  await store.markStarted(first,{...start,runId});
+  await assert.rejects(store.markStarted(second,{...start,runId}),e=>e.code==='23505');
+  const row=await pool.query('SELECT state,executor_run_id FROM agent_task_dispatch WHERE task_id=$1',[second]);
+  assert.equal(row.rows[0].state,'RESERVED');
+  assert.equal(row.rows[0].executor_run_id,null);
+  const events=await pool.query('SELECT event_type FROM agent_dispatch_audit WHERE task_id=$1 ORDER BY event_id',[second]);
+  assert.deepEqual(events.rows.map(x=>x.event_type),['RESERVED']);
+ });
  test('real PostgreSQL: transaction failure does not create a dispatch record',async()=>{
   const other=tag+'-rollback';
   const client=await pool.connect();
