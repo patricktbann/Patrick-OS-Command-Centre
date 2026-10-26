@@ -32,6 +32,19 @@ export function createPostgresReservationStore(pool){
     return {accepted:true};
    });
   },
+  async markReconciliationRequired(taskId,reason){
+   if(!validId(taskId)||typeof reason!=='string'||!reason.trim())
+    throw new DispatchError('INVALID_RECONCILIATION','Task ID and reason required');
+   return transaction(pool,async client=>{
+    const updated=await client.query(
+     "UPDATE agent_task_dispatch SET state='RECONCILIATION_REQUIRED',updated_at=now() WHERE task_id=$1 AND state='RESERVED' RETURNING task_id",
+     [taskId]);
+    if(updated.rowCount!==1)throw new DispatchError('INVALID_RESERVATION_STATE','Task not in reserved state');
+    await client.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'RECONCILIATION_REQUIRED',$2::jsonb)",
+     [taskId,JSON.stringify({reason:reason.slice(0,160)})]);
+    return {recorded:true};
+   });
+  },
   async markStarted(taskId,data){
    if(!validId(taskId)||!validId(data?.runId)||!validId(data?.executorType)||!validId(data?.approvalId))
     throw new DispatchError('INVALID_RUN_EVIDENCE','Missing valid started-run identifiers');
