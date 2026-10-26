@@ -74,8 +74,18 @@ export async function dispatchApprovedTask(input,{policy,store,executor,verifyDi
    return {status:'DISPATCH_ACCEPTED',taskId:plan.taskId,runId:run.runId,
      executorType:run.executorType,executionCompleted:false};
  }catch(error){
-   // Caller must inspect durable reservation and reconcile remote run before retry.
+   // Never call executor again after ambiguous failure. Persist uncertainty first.
+   // Even if persistence fails, the original reservation remains and retries are prohibited.
+   let recorded=false;
+   if(typeof store.markReconciliationRequired==='function'){
+     try{
+       await store.markReconciliationRequired(plan.taskId,'executor_response_or_persistence_uncertain');
+       recorded=true;
+     }catch(_){ /* do not override the original ambiguous execution status */ }
+   }
    throw new DispatchError('RECONCILIATION_REQUIRED',
-     'Reserved task cannot be safely retried without checking executor: '+String(error.message||error));
+     'Task is reserved; execution outcome uncertain. Automatic retry prohibited. '+
+     (recorded?'Recovery audit recorded.':'Recovery audit NOT confirmed; operator must inspect DB.')+
+     ' Cause: '+String(error.message||error));
  }
 }
