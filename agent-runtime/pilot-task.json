@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "3.5.2",
+  "taskId": "TSY-PILOT-001",
+  "agentId": "TSY-A0001",
+  "companyId": "TSY-GROUP",
+  "divisionId": "software",
+  "repository": "patricktbann/Patrick-OS-Command-Centre",
+  "objective": "Execute an isolated GitHub Actions test job and produce an auditable evidence artifact.",
+  "acceptanceCriteria": "Contract and dispatch tests pass and the workflow publishes its job context and evidence manifest.",
+  "allowedActions": ["read-repo", "run-tests"],
+  "approvalRequired": true,
+  "executionClass": "github-actions-sandbox-test",
+  "codexCloud": false,
+  "authorizesDeployment": false
+}
