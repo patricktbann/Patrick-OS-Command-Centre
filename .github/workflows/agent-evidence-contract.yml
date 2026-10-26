@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run evidence state machine tests
-        run: node --test agent-runtime/*.test.mjs
+        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs
       - name: Run real GitHub-hosted sandbox pilot
         run: node agent-runtime/run-pilot.mjs
       - name: Verify sandbox evidence against GitHub runner context
@@ -39,3 +39,45 @@ jobs:
           path: agent-runtime/artifacts/pilot-evidence.json
           retention-days: 7
           if-no-files-found: warn
+  postgres-integration:
+    name: Ephemeral PostgreSQL reservation and audit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tsy_ci
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: tsy_agents_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tsy_ci -d tsy_agents_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: tsy_ci
+      PGPASSWORD: disposable_ci_only
+      PGDATABASE: tsy_agents_ci
+      TSY_EPHEMERAL_CI_DB: yes
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable PostgreSQL test driver
+        run: npm install --no-save --no-package-lock pg@8
+      - name: Verify PostgreSQL reservation concurrency and rollback
+        run: bash agent-runtime/sql/integration-test.sh
+      - name: Exercise actual reservation adapter against PostgreSQL
+        run: node --test agent-runtime/postgres.integration.test.mjs
