@@ -29,6 +29,20 @@ jobs:
         run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs agent-runtime/authenticated-approvals.test.mjs agent-runtime/release-gates.test.mjs
       - name: Validate Codex SDK pilot Python syntax without signing in
         run: python3 -m py_compile agent-runtime/codex-sdk-readonly-pilot.py agent-runtime/codex-sdk-login.py
+      - name: Install and inspect official Codex SDK API without logging in
+        run: |
+          python3 -m pip install --disable-pip-version-check openai-codex
+          python3 - <<'PY'
+          import importlib.metadata
+          from openai_codex import Codex, Sandbox
+          version=importlib.metadata.version('openai-codex')
+          assert callable(getattr(Codex, 'login_chatgpt', None))
+          assert callable(getattr(Codex, 'login_chatgpt_device_code', None))
+          assert callable(getattr(Codex, 'thread_start', None))
+          assert hasattr(Sandbox, 'read_only')
+          print('Official SDK import and documented interfaces verified:', version)
+          print('AUTHENTICATION NOT ATTEMPTED; NO CODEX RUN EXECUTED')
+          PY
       - name: Parse Windows host UAT launcher without executing login
         shell: pwsh
         run: |
