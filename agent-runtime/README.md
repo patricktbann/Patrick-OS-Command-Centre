@@ -81,3 +81,23 @@ Execution reference available in this session: managed environment
 `ccarenv_b64_Y2NhcmVudl84MDViYzQ2NmRkNTA4MTkxYjdkODBiMTlmMDNkNWFlNg`.
 No separately verifiable Codex Cloud task/run URL or ID was exposed to this session;
 that acceptance gate remains open and must not be substituted with a CI run ID.
+
+## Trusted authorization and durable reservation — draft PR #7
+
+`trusted-verifier.mjs` is a server-only composition of four *independently trusted* ports:
+
+1. `identity.authenticate(serverSession)` — must authenticate a server-held session and resolve a real operator identity. `serverValidated` in the session object is merely an interface marker, not sufficient authentication.
+2. `registry.loadAssignment(taskId)` and `registry.canDispatch(operator,company,division)` — must load an immutable approved task and authorize its scope.
+3. `approvals.findApprovedDecision(taskId,principalId)` — must consult durable, authenticated Patrick approval records.
+4. `github.verifyIssue(taskId,agentId,repository)` — must read GitHub evidence on the server through an authorized connector.
+
+The verifier generates canonical fields from those services; browser-supplied `actor`, `approval` and `verifiedIssue` must never be accepted. The binding `bindTrustedDispatch` must only be called by server code with a genuine server-side session provider.
+
+`postgres-store.mjs` supplies a PostgreSQL-compatible transaction adapter with atomic unique task reservations and append-only audit rows, based on `sql/001-agent-dispatch.sql`. This migration has NOT been applied. Tests simulate PostgreSQL queries and rollbacks; they are NOT integration tests against a live PostgreSQL service.
+
+**Known limitations requiring engineering and approval before production**:
+- No concrete authenticated session handler, identity provider, durable task/approval repositories or GitHub verification service have been wired.
+- No real PostgreSQL connection, migration run, transaction concurrency test on PostgreSQL, backup/recovery or database-access policy has been verified.
+- `dispatchApprovedTask` currently preserves ambiguous reservations for reconciliation but does not mark `RECONCILIATION_REQUIRED` durably; add a recovery process and audit before live use.
+- A real Codex executor must return an independently verifiable task/run identifier; a GitHub Actions test ID is not Codex evidence.
+- No secrets, live services or paid subscriptions should be activated from this draft PR. Patrick approval is required for deployment and any production migration.
