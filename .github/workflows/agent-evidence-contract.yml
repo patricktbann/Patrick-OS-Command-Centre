@@ -1,0 +1,29 @@
+name: Agent evidence contract
+on:
+  pull_request:
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  push:
+    branches:
+      - 'feature/v3.5-agent-evidence-state-machine'
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-contract:
+    name: Verify AI agent task evidence rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run evidence state machine tests
+        run: node --test agent-runtime/evidence.test.mjs
