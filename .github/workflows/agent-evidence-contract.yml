@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run evidence state machine tests
-        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs
+        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs agent-runtime/authenticated-approvals.test.mjs
       - name: Run real GitHub-hosted sandbox pilot
         run: node agent-runtime/run-pilot.mjs
       - name: Verify sandbox evidence against GitHub runner context
