@@ -37,7 +37,7 @@ def preflight(root: Path) -> dict:
     if git("-C", str(root), "status", "--porcelain"):
         raise RuntimeError("Working tree must be clean before Codex session")
     origin = git("-C", str(root), "remote", "get-url", "origin")
-    if not re.fullmatch(r"(?:https://github\\.com/|git@github\\.com:|ssh://git@github\\.com/)patricktbann/Patrick-OS-Command-Centre(?:\\.git)?", origin):
+    if not re.fullmatch(r"(?:https://github[.]com/|git@github[.]com:|ssh://git@github[.]com/)patricktbann/Patrick-OS-Command-Centre(?:[.]git)?", origin):
         raise RuntimeError("Wrong GitHub origin")
     return {"repository":EXPECTED_REPOSITORY,"branch":branch,
             "headSha":git("-C",str(root),"rev-parse","HEAD")}
