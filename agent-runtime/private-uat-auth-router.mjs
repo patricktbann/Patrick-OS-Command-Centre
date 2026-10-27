@@ -20,7 +20,7 @@ const reply=(status,body='')=>({status,headers:{'Content-Type':'text/plain; char
 function header(headers,name){
  const v=headers?.[name];return typeof v==='string'?v:null;
 }
-export function createPrivateUatAuthRouter({issuer,identity,origin}={}){
+export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry}={}){
  if(typeof origin!=='string'||!/^https:\/\/[a-z0-9.-]+(?::[0-9]{2,5})?$/i.test(origin))
   throw new DispatchError('PRIVATE_UAT_NOT_CONFIGURED','Exact approved HTTPS origin required');
  const originUrl=new URL(origin);
@@ -52,6 +52,14 @@ export function createPrivateUatAuthRouter({issuer,identity,origin}={}){
        body:JSON.stringify({authenticated:!!session})};
    }
    else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
+   else if(path==='/api/staff'&&method==='GET'){
+     const session=await callback.sessionFromRequest(req);
+     const principal=session?await identity.authenticate(session):null;
+     const allowed=principal?.authenticated===true&&principal?.id==='patrick-principal'&&typeof staffRegistry?.listStaff==='function';
+     const staff=allowed?await staffRegistry.listStaff(principal):[];
+     response={status:allowed?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
+       body:JSON.stringify(allowed?{staff,executionEnabled:false}:{error:'SESSION_REQUIRED'})};
+   }
    else response=reply(404,'Not found');
    // Never return request headers, OAuth codes or session secrets in the body.
    return Object.freeze({...response,headers:{...fixedHeaders,...response.headers}});

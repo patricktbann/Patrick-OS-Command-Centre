@@ -8,6 +8,7 @@ import {join} from 'node:path';
 import {createGitHubOAuthIssuer} from './github-oauth-session-issuer.mjs';
 import {createPostgresSessionIdentity} from './postgres-session-identity.mjs';
 import {createPrivateUatAuthRouter} from './private-uat-auth-router.mjs';
+import {createPrivateStaffRegistry} from './private-staff-registry.mjs';
 import {createLoopbackHttpsUatHost,loadLocalTls} from './loopback-https-uat-host.mjs';
 const root=process.env.LOCALAPPDATA;
 if(!root)throw Error('Missing local profile');
@@ -38,7 +39,7 @@ try{
   redirectUri:origin+'/auth/github/callback',expectedGitHubUserId,
   principalId:'patrick-principal'});
  const identity=createPostgresSessionIdentity({pool});
- const router=createPrivateUatAuthRouter({issuer,identity,origin});
+ const router=createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry:createPrivateStaffRegistry()});
  host=createLoopbackHttpsUatHost({router,port:18443,tlsKey,tlsCert});
  await host.start();
  console.log('PATRICK_OS_REAL_GITHUB_OAUTH_UAT_READY');
