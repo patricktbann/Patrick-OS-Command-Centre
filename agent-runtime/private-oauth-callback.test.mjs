@@ -74,3 +74,35 @@ test('logout requires matching origin and revokes session secret',async()=>{
 test('malconfigured issuer or invalid origin refuses to build',()=>{
  assert.throws(()=>createPrivateOAuthCallback({origin:'http://localhost'}),e=>e.code==='PRIVATE_OAUTH_NOT_CONFIGURED');
 });
+
+test('safe diagnostic: missing state cookie is distinguished without OAuth code leakage',async()=>{
+ const {app,req}=fixture();
+ const r=await app.callback(req('/auth/github/callback?state='+state+'&code=super-sensitive-code'));
+ assert.equal(r.status,403);assert.equal(r.headers['X-UAT-Auth-Result'],'STATE_COOKIE_MISSING');
+ assert.equal(JSON.stringify(r).includes('super-sensitive-code'),false);
+});
+test('safe diagnostic: cookie/state mismatch is distinguished without echoing tokens',async()=>{
+ const {app,req}=fixture();
+ const r=await app.callback(req('/auth/github/callback?state='+state+'&code=secret-code',
+ {cookie:'__Host-patrick_oauth_state='+'q'.repeat(43)}));
+ assert.equal(r.headers['X-UAT-Auth-Result'],'STATE_MISMATCH');
+ assert.equal(JSON.stringify(r).includes('secret-code'),false);
+});
+test('safe diagnostic: provider denial is generic, no thrown provider detail',async()=>{
+ const issuer={beginLogin:async()=>({}),completeLogin:async()=>{const e=Error('SECRET ACCESS TOKEN');e.code='OAUTH_DENIED';throw e},
+ revokeSession:async()=>({})};
+ const app=createPrivateOAuthCallback({issuer,identity:{authenticate:async()=>null},origin:origin});
+ const req=(path,headers={})=>({url:origin+path,method:'GET',secureTransport:true,headers});
+ const r=await app.callback(req('/auth/github/callback?state='+state+'&code=ci-code',
+ {cookie:'__Host-patrick_oauth_state='+state}));
+ assert.equal(r.headers['X-UAT-Auth-Result'],'PROVIDER_OR_STATE_EXCHANGE_DENIED');
+ assert.equal(JSON.stringify(r).includes('SECRET ACCESS TOKEN'),false);
+});
+test('safe diagnostic: unexpected database failure is categorized without its message',async()=>{
+ const issuer={beginLogin:async()=>({}),completeLogin:async()=>{throw Error('db password secret')},revokeSession:async()=>({})};
+ const app=createPrivateOAuthCallback({issuer,identity:{authenticate:async()=>null},origin});
+ const r=await app.callback({url:origin+'/auth/github/callback?state='+state+'&code=ci-code',
+ method:'GET',secureTransport:true,headers:{cookie:'__Host-patrick_oauth_state='+state}});
+ assert.equal(r.headers['X-UAT-Auth-Result'],'SESSION_BACKEND_FAILED');
+ assert.equal(JSON.stringify(r).includes('db password secret'),false);
+});
