@@ -91,7 +91,14 @@ export function createPrivateOAuthCallback({issuer,identity,origin,callbackPath=
       ]
     },body:''};
    }catch(error){
-     return fail(error?.code==='OAUTH_DENIED'?'PROVIDER_OR_STATE_EXCHANGE_DENIED':'SESSION_BACKEND_FAILED');
+     const safeReasons={
+       OAUTH_LOGIN_STATE_REJECTED:'LOGIN_STATE_REJECTED',
+       OAUTH_TOKEN_EXCHANGE_FAILED:'GITHUB_TOKEN_EXCHANGE_FAILED',
+       OAUTH_PROFILE_LOOKUP_FAILED:'GITHUB_PROFILE_LOOKUP_FAILED',
+       OAUTH_IDENTITY_DENIED:'GITHUB_IDENTITY_DENIED',
+       OAUTH_DENIED:'PROVIDER_OR_STATE_EXCHANGE_DENIED'
+     };
+     return fail(safeReasons[error?.code]||'SESSION_BACKEND_FAILED');
    }
   },
   async sessionFromRequest(request){
