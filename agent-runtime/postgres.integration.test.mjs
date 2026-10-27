@@ -5,6 +5,7 @@ import pg from 'pg';
 import {createPostgresReservationStore} from './postgres-store.mjs';
 import {createPostgresApprovals} from './postgres-approvals.mjs';
 import {taskDigest} from './task-digest.mjs';
+import {createAtomicSdkReservationStore} from './postgres-sdk-reservation.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
 for(const k of required)if(!process.env[k])throw new Error('Disposable Postgres test environment missing '+k);
@@ -17,7 +18,8 @@ const pool=new pg.Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT),
  connectionTimeoutMillis:5000});
 const schema=await readFile(new URL('./sql/001-agent-dispatch.sql',import.meta.url),'utf8');
 const approvalSchema=await readFile(new URL('./sql/002-agent-approvals.sql',import.meta.url),'utf8');
-try{await pool.query(schema);await pool.query(approvalSchema)}catch(e){await pool.end();throw e}
+const sdkSchema=await readFile(new URL('./sql/003-atomic-sdk-reservation.sql',import.meta.url),'utf8');
+try{await pool.query(schema);await pool.query(approvalSchema);await pool.query(sdkSchema)}catch(e){await pool.end();throw e}
 const store=createPostgresReservationStore(pool);
 const tag='it-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;
 const taskId=tag+'-concurrent';
@@ -132,4 +134,78 @@ test('real PostgreSQL: unauthenticated approval never reaches storage',async()=>
  await assert.rejects(approvals.approve({approvalId:tag+'-not-approved',task:{taskId:tag+'-no-task',repository:'x/y'},principalId:'patrick-id',principalAuthenticated:false,approvedAt:new Date().toISOString()}),e=>e.code==='UNAUTHORIZED_APPROVAL');
  const r=await pool.query('SELECT count(*)::integer AS n FROM agent_task_approval WHERE approval_id=$1',[tag+'-not-approved']);
  assert.equal(r.rows[0].n,0);
+});
+
+test('real PostgreSQL: locked approval permits one SDK reservation and durable binding',async()=>{
+ const store=createAtomicSdkReservationStore(pool),approvals=createPostgresApprovals(pool);
+ const task={taskId:tag+'-sdk-single',agentId:'TSY-A0001',companyId:'TSY-GROUP',
+ divisionId:'software',repository:'patricktbann/Patrick-OS-Command-Centre',
+ objective:'Read-only SDK audit',acceptanceCriteria:'Evidence only',allowedActions:['read-repo'],approvalRequired:true};
+ const principalId='patrick-principal',approvalId=tag+'-sdk-approval';
+ const a=await approvals.approve({approvalId,task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()});
+ const binding={taskId:task.taskId,repository:task.repository,approvalId,taskDigest:a.taskDigest,
+  principalId,operatorId:'verified-operator',allowedActions:['read-repo']};
+ const results=await Promise.all(Array.from({length:12},()=>store.reserveWithCurrentApproval(binding)));
+ assert.equal(results.filter(x=>x.accepted).length,1);
+ assert.equal(results.filter(x=>!x.accepted).length,11);
+ const rows=await pool.query('SELECT state,approval_id,repository,task_digest,principal_id,operator_id,allowed_actions FROM agent_task_dispatch WHERE task_id=$1',[task.taskId]);
+ assert.equal(rows.rows.length,1);
+ assert.equal(rows.rows[0].task_digest,a.taskDigest);
+ assert.deepEqual(rows.rows[0].allowed_actions,['read-repo']);
+ const review=await store.recordOutcome(binding,{threadId:tag+'-auth-sdk-thread',executorType:'codex-sdk-local',commitSha:'a'.repeat(40),status:'UAT_QA_PENDING'});
+ assert.deepEqual(review,{recorded:true});
+ const audit=await pool.query('SELECT event_type FROM agent_dispatch_audit WHERE task_id=$1 ORDER BY event_id',[task.taskId]);
+ assert.deepEqual(audit.rows.map(x=>x.event_type),['RESERVED_APPROVED_SDK','SDK_QA_PENDING']);
+});
+test('real PostgreSQL: revoked approval cannot reserve and bad digest denied',async()=>{
+ const store=createAtomicSdkReservationStore(pool),approvals=createPostgresApprovals(pool);
+ const task={taskId:tag+'-sdk-revoked',agentId:'TSY-A0001',companyId:'TSY-GROUP',
+ divisionId:'software',repository:'patricktbann/Patrick-OS-Command-Centre',
+ objective:'Read-only SDK audit',acceptanceCriteria:'Evidence only',allowedActions:['read-repo'],approvalRequired:true};
+ const principalId='patrick-principal',approvalId=tag+'-revoked-approval';
+ const a=await approvals.approve({approvalId,task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()});
+ const binding={taskId:task.taskId,repository:task.repository,approvalId,taskDigest:a.taskDigest,
+  principalId,operatorId:'verified-operator',allowedActions:['read-repo']};
+ assert.deepEqual(await store.reserveWithCurrentApproval({...binding,taskDigest:'b'.repeat(64)}),{accepted:false});
+ await approvals.revoke({approvalId,principalId,principalAuthenticated:true});
+ assert.deepEqual(await store.reserveWithCurrentApproval(binding),{accepted:false});
+ const c=await pool.query('SELECT count(*)::integer AS n FROM agent_task_dispatch WHERE task_id=$1',[task.taskId]);
+ assert.equal(c.rows[0].n,0);
+});
+test('real PostgreSQL: revocation locked during transaction resolves deterministically',async()=>{
+ const store=createAtomicSdkReservationStore(pool),approvals=createPostgresApprovals(pool);
+ const task={taskId:tag+'-sdk-race',agentId:'TSY-A0001',companyId:'TSY-GROUP',
+ divisionId:'software',repository:'patricktbann/Patrick-OS-Command-Centre',
+ objective:'Read-only race check',acceptanceCriteria:'Evidence only',allowedActions:['read-repo'],approvalRequired:true};
+ const principalId='patrick-principal',approvalId=tag+'-race-approval';
+ const a=await approvals.approve({approvalId,task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()});
+ const binding={taskId:task.taskId,repository:task.repository,approvalId,taskDigest:a.taskDigest,
+  principalId,operatorId:'verified-operator',allowedActions:['read-repo']};
+ // Hold the approval row, revoke before the reservation can acquire FOR UPDATE.
+ const blocker=await pool.connect();
+ try{
+  await blocker.query('BEGIN');
+  await blocker.query('SELECT approval_id FROM agent_task_approval WHERE approval_id=$1 FOR UPDATE',[approvalId]);
+  const attempt=store.reserveWithCurrentApproval(binding);
+  await blocker.query("UPDATE agent_task_approval SET status='REVOKED',revoked_at=now() WHERE approval_id=$1",[approvalId]);
+  await blocker.query('COMMIT');
+  assert.deepEqual(await attempt,{accepted:false});
+ }finally{try{await blocker.query('ROLLBACK')}catch{} blocker.release()}
+ const row=await pool.query('SELECT count(*)::integer AS n FROM agent_task_dispatch WHERE task_id=$1',[task.taskId]);
+ assert.equal(row.rows[0].n,0);
+});
+test('real PostgreSQL: SDK ambiguity quarantines and blocks replay',async()=>{
+ const store=createAtomicSdkReservationStore(pool),approvals=createPostgresApprovals(pool);
+ const task={taskId:tag+'-sdk-uncertain',agentId:'TSY-A0001',companyId:'TSY-GROUP',
+ divisionId:'software',repository:'patricktbann/Patrick-OS-Command-Centre',
+ objective:'Read-only uncertainty',acceptanceCriteria:'Evidence only',allowedActions:['read-repo'],approvalRequired:true};
+ const principalId='patrick-principal',approvalId=tag+'-uncertain-approval';
+ const a=await approvals.approve({approvalId,task,principalId,principalAuthenticated:true,approvedAt:new Date().toISOString()});
+ const binding={taskId:task.taskId,repository:task.repository,approvalId,taskDigest:a.taskDigest,
+  principalId,operatorId:'verified-operator',allowedActions:['read-repo']};
+ assert.deepEqual(await store.reserveWithCurrentApproval(binding),{accepted:true});
+ assert.deepEqual(await store.quarantine(binding,{reason:'SDK_OUTCOME_UNCERTAIN'}),{recorded:true});
+ assert.deepEqual(await store.reserveWithCurrentApproval(binding),{accepted:false});
+ const state=await pool.query('SELECT state FROM agent_task_dispatch WHERE task_id=$1',[task.taskId]);
+ assert.equal(state.rows[0].state,'RECONCILIATION_REQUIRED');
 });
