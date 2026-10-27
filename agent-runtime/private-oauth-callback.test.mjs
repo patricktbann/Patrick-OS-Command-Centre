@@ -106,3 +106,20 @@ test('safe diagnostic: unexpected database failure is categorized without its me
  assert.equal(r.headers['X-UAT-Auth-Result'],'SESSION_BACKEND_FAILED');
  assert.equal(JSON.stringify(r).includes('db password secret'),false);
 });
+
+test('safe diagnostic: only allowlisted GitHub failure reasons are exposed',async()=>{
+ for(const [code,reason] of [
+  ['OAUTH_LOGIN_STATE_REJECTED','LOGIN_STATE_REJECTED'],
+  ['OAUTH_TOKEN_EXCHANGE_FAILED','GITHUB_TOKEN_EXCHANGE_FAILED'],
+  ['OAUTH_PROFILE_LOOKUP_FAILED','GITHUB_PROFILE_LOOKUP_FAILED'],
+  ['OAUTH_IDENTITY_DENIED','GITHUB_IDENTITY_DENIED']]){
+  const issuer={beginLogin:async()=>({}),completeLogin:async()=>{const e=Error('raw provider secret');e.code=code;throw e},
+   revokeSession:async()=>({})};
+  const app=createPrivateOAuthCallback({issuer,identity:{authenticate:async()=>null},origin});
+  const r=await app.callback({url:origin+'/auth/github/callback?state='+state+'&code=private-code',
+   method:'GET',secureTransport:true,headers:{cookie:'__Host-patrick_oauth_state='+state}});
+  assert.equal(r.headers['X-UAT-Auth-Result'],reason);
+  assert.equal(JSON.stringify(r).includes('private-code'),false);
+  assert.equal(JSON.stringify(r).includes('raw provider secret'),false);
+ }
+});
