@@ -52,3 +52,12 @@ test('route failure emits generic response and no private error details',async()
  const f=setup({response:{status:NaN}}),r=await f.run(f.req());
  assert.equal(r.status,500);assert.equal(r.body,'Internal UAT error');
 });
+
+test('allow empty logout POST but reject nonempty Content-Length request bodies',async()=>{
+ const f=setup();
+ const empty=await f.run({...f.req('/auth/logout'),method:'POST',headers:{host:'127.0.0.1:8443','content-length':'0'}});
+ assert.equal(empty.status,200);
+ const payload=await f.run({...f.req('/auth/logout'),method:'POST',headers:{host:'127.0.0.1:8443','content-length':'1'}});
+ assert.equal(payload.status,403);
+ assert.equal(f.handled.length,1);
+});
