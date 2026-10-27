@@ -19,7 +19,8 @@ export function createLoopbackHttpsUatHost({router,hostname='127.0.0.1',port=844
    const expected=hostname==='::1'?'[::1]:'+port:hostname+':'+port;
    if(host!==expected||req.headers['x-forwarded-host']||
       req.headers['x-forwarded-proto']||req.headers.forwarded||
-      req.headers['transfer-encoding']||req.headers['content-length']||
+      req.headers['transfer-encoding']||
+      (req.headers['content-length']!==undefined&&req.headers['content-length']!=='0')||
       req.headers.cookie?.length>4096){
      res.writeHead(403,{'Cache-Control':'no-store','Content-Type':'text/plain'});
      res.end('Denied');return;
