@@ -32,7 +32,11 @@ function requireSecure(request,method){
 }
 const set=(name,value,tail)=>name+'='+value+'; Path=/; Secure; HttpOnly; '+tail;
 const expire=name=>set(name,'','SameSite=Lax; Max-Age=0');
-const fail=()=>({status:403,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'},body:'Authorization failed. Start a new login.'});
+// Fixed, non-sensitive diagnostic categories. Never include code, state, tokens,
+// cookie values, provider response bodies or raw exception messages.
+const fail=(reason='OAUTH_DENIED')=>({status:403,headers:{'Cache-Control':'no-store',
+ 'Content-Type':'text/plain; charset=utf-8','X-UAT-Auth-Result':reason,
+ 'Referrer-Policy':'no-referrer'},body:'Authorization failed ('+reason+'). Start a new login.'});
 export function createPrivateOAuthCallback({issuer,identity,origin,callbackPath='/auth/github/callback',landingPath='/ai-office'}={}){
  if(typeof issuer?.beginLogin!=='function'||typeof issuer?.completeLogin!=='function'||
  typeof issuer?.revokeSession!=='function'||typeof identity?.authenticate!=='function'||
@@ -69,13 +73,15 @@ export function createPrivateOAuthCallback({issuer,identity,origin,callbackPath=
   async callback(request){
    requireSecure(request,'GET');
    const url=requestUrl(request);
-   if(!url||url.pathname!==callbackPath)return fail();
+   if(!url||url.pathname!==callbackPath)return fail('CALLBACK_ROUTE_INVALID');
    const code=url.searchParams.getAll('code'),states=url.searchParams.getAll('state');
    const cookieState=cookieValue(request,STATE_COOKIE);
-   if(code.length!==1||states.length!==1||!safeEqual(cookieState,states[0]))return fail();
+   if(code.length!==1||states.length!==1)return fail('CALLBACK_PARAMETERS_INVALID');
+   if(!cookieState)return fail('STATE_COOKIE_MISSING');
+   if(!safeEqual(cookieState,states[0]))return fail('STATE_MISMATCH');
    try{
     const issued=await issuer.completeLogin({code:code[0],state:states[0]});
-    if(typeof issued?.serverSessionSecret!=='string'||issued.serverSessionSecret.length<43)return fail();
+    if(typeof issued?.serverSessionSecret!=='string'||issued.serverSessionSecret.length<43)return fail('SESSION_ISSUANCE_INVALID');
     return {status:303,headers:{
       Location:origin+landingPath,'Cache-Control':'no-store',
       'Referrer-Policy':'no-referrer',
@@ -84,7 +90,16 @@ export function createPrivateOAuthCallback({issuer,identity,origin,callbackPath=
         set(SESSION_COOKIE,issued.serverSessionSecret,'SameSite=Strict; Max-Age=1800')
       ]
     },body:''};
-   }catch{return fail()}
+   }catch(error){
+     const safeReasons={
+       OAUTH_LOGIN_STATE_REJECTED:'LOGIN_STATE_REJECTED',
+       OAUTH_TOKEN_EXCHANGE_FAILED:'GITHUB_TOKEN_EXCHANGE_FAILED',
+       OAUTH_PROFILE_LOOKUP_FAILED:'GITHUB_PROFILE_LOOKUP_FAILED',
+       OAUTH_IDENTITY_DENIED:'GITHUB_IDENTITY_DENIED',
+       OAUTH_DENIED:'PROVIDER_OR_STATE_EXCHANGE_DENIED'
+     };
+     return fail(safeReasons[error?.code]||'SESSION_BACKEND_FAILED');
+   }
   },
   async sessionFromRequest(request){
    requireSecure(request,'GET');

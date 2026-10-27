@@ -64,21 +64,21 @@ test('reusing one OAuth state cannot issue another session',async()=>{
  const f=fixture();const {authorizationUrl}=await f.issuer.beginLogin();
  const state=new URL(authorizationUrl).searchParams.get('state');
  await f.issuer.completeLogin({code:'github-code',state});
- await assert.rejects(f.issuer.completeLogin({code:'github-code',state}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(f.issuer.completeLogin({code:'github-code',state}),e=>e.code==='OAUTH_LOGIN_STATE_REJECTED');
  assert.equal(f.sessions.size,1);
 });
 test('wrong GitHub user ID cannot become Patrick even with same username',async()=>{
  const f=fixture({identityId:USER+1});const {authorizationUrl}=await f.issuer.beginLogin();
- await assert.rejects(f.issuer.completeLogin({code:'github-code',state:new URL(authorizationUrl).searchParams.get('state')}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(f.issuer.completeLogin({code:'github-code',state:new URL(authorizationUrl).searchParams.get('state')}),e=>e.code==='OAUTH_IDENTITY_DENIED');
  assert.equal(f.sessions.size,0);
 });
 test('failed token exchange consumes challenge without session issuance',async()=>{
  const f=fixture({failExchange:true});const {authorizationUrl}=await f.issuer.beginLogin();
- await assert.rejects(f.issuer.completeLogin({code:'github-code',state:new URL(authorizationUrl).searchParams.get('state')}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(f.issuer.completeLogin({code:'github-code',state:new URL(authorizationUrl).searchParams.get('state')}),e=>e.code==='OAUTH_TOKEN_EXCHANGE_FAILED');
  assert.equal(f.sessions.size,0);
 });
 test('unrecognized state is rejected before contacting GitHub',async()=>{
  const f=fixture();
- await assert.rejects(f.issuer.completeLogin({code:'github-code',state:STATE}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(f.issuer.completeLogin({code:'github-code',state:STATE}),e=>e.code==='OAUTH_LOGIN_STATE_REJECTED');
  assert.equal(f.requests.length,0);
 });
