@@ -8,6 +8,7 @@ import {taskDigest} from './task-digest.mjs';
 import {createHash,randomBytes} from 'node:crypto';
 import {createPostgresSessionIdentity} from './postgres-session-identity.mjs';
 import {createGitHubOAuthIssuer} from './github-oauth-session-issuer.mjs';
+import {createPrivateUatAuthRouter} from './private-uat-auth-router.mjs';
 import {createAtomicSdkReservationStore} from './postgres-sdk-reservation.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
@@ -265,4 +266,38 @@ test('real PostgreSQL: unknown OAuth state is denied without session issuance',a
  fetchFn:async()=>{touched=true;throw Error('Unexpected external exchange')}});
  await assert.rejects(issuer.completeLogin({code:'ci-test-code',state:'q'.repeat(43)}),e=>e.code==='OAUTH_DENIED');
  assert.equal(touched,false);
+});
+
+test('real PostgreSQL: private router OAuth -> callback -> identity -> logout complete UAT chain',async()=>{
+ const origin='https://ai-office-uat.example.test';
+ const issuer=createGitHubOAuthIssuer({pool,clientId:'ci-uat-client',clientSecret:'not-a-real-secret',
+  redirectUri:origin+'/auth/github/callback',expectedGitHubUserId:316092977,
+  principalId:'patrick-principal',fetchFn:async url=>{
+   if(url.includes('access_token'))return {ok:true,json:async()=>({access_token:'mock-token'})};
+   return {ok:true,json:async()=>({id:316092977})};
+  }});
+ const identity=createPostgresSessionIdentity({pool});
+ const router=createPrivateUatAuthRouter({issuer,identity,origin});
+ const req=(url,method='GET',headers={})=>({url,method,headers:{host:'ai-office-uat.example.test',...headers}});
+ const handle=r=>router.handle(r,{trustedHttps:true});
+ const beginning=await handle(req('/auth/github/start'));
+ assert.equal(beginning.status,303);
+ const state=new URL(beginning.headers.Location).searchParams.get('state');
+ assert.ok(state);assert.equal(beginning.headers['Set-Cookie'].includes(state),true);
+ const callback=await handle(req('/auth/github/callback?state='+state+'&code=mock-code','GET',
+  {cookie:'__Host-patrick_oauth_state='+state}));
+ assert.equal(callback.status,303);
+ const setCookie=callback.headers['Set-Cookie'][1];
+ const secret=setCookie.match(/__Host-patrick_session=([A-Za-z0-9_-]+)/)?.[1];
+ assert.ok(secret);
+ let session=await handle(req('/auth/session','GET',{cookie:'__Host-patrick_session='+secret}));
+ assert.equal(session.status,200);assert.deepEqual(JSON.parse(session.body),{authenticated:true});
+ const replay=await handle(req('/auth/github/callback?state='+state+'&code=mock-code','GET',
+  {cookie:'__Host-patrick_oauth_state='+state}));
+ assert.equal(replay.status,403);
+ const logout=await handle(req('/auth/logout','POST',
+  {cookie:'__Host-patrick_session='+secret,origin}));
+ assert.equal(logout.status,303);
+ session=await handle(req('/auth/session','GET',{cookie:'__Host-patrick_session='+secret}));
+ assert.equal(session.status,401);
 });
