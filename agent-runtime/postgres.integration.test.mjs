@@ -5,6 +5,8 @@ import pg from 'pg';
 import {createPostgresReservationStore} from './postgres-store.mjs';
 import {createPostgresApprovals} from './postgres-approvals.mjs';
 import {taskDigest} from './task-digest.mjs';
+import {createHash,randomBytes} from 'node:crypto';
+import {createPostgresSessionIdentity} from './postgres-session-identity.mjs';
 import {createAtomicSdkReservationStore} from './postgres-sdk-reservation.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
@@ -19,7 +21,8 @@ const pool=new pg.Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT),
 const schema=await readFile(new URL('./sql/001-agent-dispatch.sql',import.meta.url),'utf8');
 const approvalSchema=await readFile(new URL('./sql/002-agent-approvals.sql',import.meta.url),'utf8');
 const sdkSchema=await readFile(new URL('./sql/003-atomic-sdk-reservation.sql',import.meta.url),'utf8');
-try{await pool.query(schema);await pool.query(approvalSchema);await pool.query(sdkSchema)}catch(e){await pool.end();throw e}
+const sessionSchema=await readFile(new URL('./sql/004-private-sessions.sql',import.meta.url),'utf8');
+try{await pool.query(schema);await pool.query(approvalSchema);await pool.query(sdkSchema);await pool.query(sessionSchema)}catch(e){await pool.end();throw e}
 const store=createPostgresReservationStore(pool);
 const tag='it-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;
 const taskId=tag+'-concurrent';
@@ -208,4 +211,26 @@ test('real PostgreSQL: SDK ambiguity quarantines and blocks replay',async()=>{
  assert.deepEqual(await store.reserveWithCurrentApproval(binding),{accepted:false});
  const state=await pool.query('SELECT state FROM agent_task_dispatch WHERE task_id=$1',[task.taskId]);
  assert.equal(state.rows[0].state,'RECONCILIATION_REQUIRED');
+});
+
+test('real PostgreSQL: hashed server session authenticates, then revocation denies',async()=>{
+ const token=randomBytes(32).toString('base64url');
+ const hash=createHash('sha256').update(token).digest('hex');
+ const principalId='patrick-principal';
+ const issued=new Date(Date.now()-1000).toISOString();
+ const expires=new Date(Date.now()+600000).toISOString();
+ await pool.query('INSERT INTO agent_private_session(session_hash,principal_id,issued_at,expires_at) VALUES($1,$2,$3,$4)',[hash,principalId,issued,expires]);
+ const identity=createPostgresSessionIdentity({pool});
+ assert.deepEqual(await identity.authenticate({serverValidated:true,opaque:token}),{authenticated:true,subject:principalId});
+ assert.equal(await identity.authenticate({serverValidated:false,opaque:token}),null);
+ assert.equal(await identity.authenticate({serverValidated:true,opaque:'z'.repeat(48)}),null);
+ await pool.query('UPDATE agent_private_session SET revoked_at=now() WHERE session_hash=$1',[hash]);
+ assert.equal(await identity.authenticate({serverValidated:true,opaque:token}),null);
+});
+test('real PostgreSQL: expired session never authenticates',async()=>{
+ const token=randomBytes(32).toString('base64url');
+ const hash=createHash('sha256').update(token).digest('hex');
+ await pool.query('INSERT INTO agent_private_session(session_hash,principal_id,issued_at,expires_at) VALUES($1,$2,now()-interval \'2 hours\',now()-interval \'1 hour\')',[hash,'patrick-principal']);
+ const identity=createPostgresSessionIdentity({pool});
+ assert.equal(await identity.authenticate({serverValidated:true,opaque:token}),null);
 });
