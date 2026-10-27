@@ -55,19 +55,23 @@ export function createGitHubOAuthIssuer({pool,clientId,clientSecret,redirectUri,
     const consumed=await c.query(
      'UPDATE agent_oauth_login_state SET consumed_at=$2 WHERE state_hash=$1 AND consumed_at IS NULL AND issued_at<=$2 AND expires_at>$2 RETURNING state_hash',
      [hash(state),current().toISOString()]);
-    if(consumed.rowCount!==1)deny('Expired, unknown or reused login state');
+    if(consumed.rowCount!==1)throw new DispatchError('OAUTH_LOGIN_STATE_REJECTED','Login state invalid or already consumed');
     return true;
    });
    if(!session)deny('No authenticated login state');
-   const token=await call('https://github.com/login/oauth/access_token',{
+   let token;
+   try{token=await call('https://github.com/login/oauth/access_token',{
     method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},
-    body:JSON.stringify({client_id:clientId,client_secret:clientSecret,code,redirect_uri:redirectUri})});
+    body:JSON.stringify({client_id:clientId,client_secret:clientSecret,code,redirect_uri:redirectUri})});}
+   catch{throw new DispatchError('OAUTH_TOKEN_EXCHANGE_FAILED','GitHub code exchange failed')}
    if(typeof token.access_token!=='string'||!token.access_token||token.error)
-     deny('Authorization code exchange failed');
-   const profile=await call('https://api.github.com/user',{
+     throw new DispatchError('OAUTH_TOKEN_EXCHANGE_FAILED','GitHub code exchange failed');
+   let profile;
+   try{profile=await call('https://api.github.com/user',{
     method:'GET',headers:{Authorization:'Bearer '+token.access_token,
-     Accept:'application/vnd.github+json','User-Agent':'Patrick-OS-private-auth'}});
-   if(profile?.id!==expectedGitHubUserId)deny('GitHub account is not the authorized Principal');
+     Accept:'application/vnd.github+json','User-Agent':'Patrick-OS-private-auth'}});}
+   catch{throw new DispatchError('OAUTH_PROFILE_LOOKUP_FAILED','GitHub user lookup failed')}
+   if(profile?.id!==expectedGitHubUserId)throw new DispatchError('OAUTH_IDENTITY_DENIED','GitHub account not permitted');
    const secret=random(32).toString('base64url');
    if(secret.length<43)deny('Insufficient session entropy');
    const issued=current(),expiry=new Date(issued.getTime()+30*60*1000);
