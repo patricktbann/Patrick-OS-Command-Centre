@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createAuthenticatedStaffIntake} from './authenticated-staff-intake.mjs';
+const staff={id:'TSY-A0003',name:'Operations Director',division:'Operations',active:true};
+const make=(authenticated=true,allowed=true)=>createAuthenticatedStaffIntake({sessionProvider:async()=>({serverValidated:true,opaque:'opaque-server-only'}),identity:{authenticate:async()=>({authenticated,subject:'patrick'})},registry:{loadStaff:async id=>id===staff.id?staff:null,canPrepare:async()=>allowed}});
+const input={agentId:staff.id,objective:'Prepare a read-only report of project risks'};
+test('authorized intake returns non-executing draft',async()=>{const d=await make().prepare(input);assert.equal(d.agentId,staff.id);assert.equal(d.dispatchEnabled,false);assert.equal(d.preparedForPrincipal,'patrick')});
+test('denies invalid session',async()=>{const x=createAuthenticatedStaffIntake({sessionProvider:async()=>null,identity:{authenticate:async()=>({authenticated:true})},registry:{loadStaff:async()=>staff,canPrepare:async()=>true}});await assert.rejects(x.prepare(input),{code:'SESSION_REQUIRED'})});
+test('denies untrusted staff and unauthorized scope',async()=>{await assert.rejects(make().prepare({...input,agentId:'TSY-A9999'}),{code:'STAFF_NOT_FOUND'});await assert.rejects(make(true,false).prepare(input),{code:'STAFF_ACCESS_DENIED'})});
+test('rejects forged browser authority fields',async()=>{const x=await make().prepare({...input,approvalStatus:'APPROVED',dispatchEnabled:true,agent:{name:'CEO'}});assert.equal(x.dispatchEnabled,false);assert.equal(x.approvalStatus,'NOT_REQUESTED')});
