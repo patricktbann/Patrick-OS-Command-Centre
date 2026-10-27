@@ -1,6 +1,6 @@
-﻿/** V3.6 private read-only staff intake; no dispatch or persistence. */
+/** V3.6 private read-only staff intake; no dispatch or persistence. */
 import {prepareStaffTask} from './staff-task-pilot.mjs';
-import {DispatchError} from './dispatch.mjs';
+import {StaffPilotError as DispatchError} from './staff-pilot-error.mjs';
 export function createAuthenticatedStaffIntake({sessionProvider,identity,registry}={}){
  if(typeof sessionProvider!=='function'||typeof identity?.authenticate!=='function'||typeof registry?.loadStaff!=='function')
   throw new DispatchError('INTAKE_NOT_CONFIGURED','Trusted private dependencies required');

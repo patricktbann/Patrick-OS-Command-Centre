@@ -1,5 +1,5 @@
-﻿/** V3.6 read-only staff task preparation. No execution, no authorization. */
-import {DispatchError} from './dispatch.mjs';
+/** V3.6 read-only staff task preparation. No execution, no authorization. */
+import {StaffPilotError as DispatchError} from './staff-pilot-error.mjs';
 const ALLOWED=new Set(['Group Command','Operations','Finance & Investment']);
 const clean=x=>typeof x==='string'?x.trim():'';
 export function prepareStaffTask({agent,objective,repository}={}){
