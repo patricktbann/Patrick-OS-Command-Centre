@@ -37,7 +37,10 @@ flag 'POSTGRES_UAT_CONFIG' $pgConfig
 if($null -ne $listener){Write-Output 'HTTPS_PORT_18443=IN_USE'}else{Write-Output 'HTTPS_PORT_18443=AVAILABLE'}
 if($repo -and $node -and $dpapi -and $tls -and $pgConfig -and $null -eq $listener){
  Write-Output 'PRIVATE_UAT_STATIC_PREFLIGHT=READY'
+ Write-Output 'NO_SERVICES_STARTED_NO_SECRETS_DISCLOSED_NO_DATABASE_WRITTEN'
+ exit 0
 }else{
  Write-Output 'PRIVATE_UAT_STATIC_PREFLIGHT=HOLD'
+ Write-Output 'NO_SERVICES_STARTED_NO_SECRETS_DISCLOSED_NO_DATABASE_WRITTEN'
+ exit 2
 }
-Write-Output 'NO_SERVICES_STARTED_NO_SECRETS_DISCLOSED_NO_DATABASE_WRITTEN'
