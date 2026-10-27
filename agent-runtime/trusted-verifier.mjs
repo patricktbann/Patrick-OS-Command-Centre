@@ -51,7 +51,8 @@ export function createTrustedVerifier({identity,registry,approvals,github,policy
      task:structuredClone(stored),idempotencyKey:stored.taskId,
      actor:{subject:auth.subject,authenticated:true,canDispatch:true},
      approval:{trustedBackendVerified:true,taskId:stored.taskId,authorizedPrincipalId:decision.principalId,
-       decision:'approve',approvalId:decision.approvalId,approvedAt:decision.approvedAt},
+       decision:'approve',approvalId:decision.approvalId,approvedAt:decision.approvedAt,
+       taskDigest:decision.taskDigest},
      verifiedIssue:{trustedBackendVerified:true,taskId:stored.taskId,agentId:stored.agentId,
        repository:stored.repository,number:issue.number}
    };
