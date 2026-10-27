@@ -1,8 +1,8 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAuthenticatedStaffIntake} from './authenticated-staff-intake.mjs';
 const staff={id:'TSY-A0003',name:'Operations Director',division:'Operations',active:true};
-const make=(authenticated=true,allowed=true)=>createAuthenticatedStaffIntake({sessionProvider:async()=>({serverValidated:true,opaque:'opaque-server-only'}),identity:{authenticate:async()=>({authenticated,id:'patrick'})},registry:{loadStaff:async id=>id===staff.id?staff:null,canPrepare:async()=>allowed}});
+const make=(authenticated=true,allowed=true)=>createAuthenticatedStaffIntake({sessionProvider:async()=>({serverValidated:true,opaque:'opaque-server-only'}),identity:{authenticate:async()=>({authenticated,subject:'patrick'})},registry:{loadStaff:async id=>id===staff.id?staff:null,canPrepare:async()=>allowed}});
 const input={agentId:staff.id,objective:'Prepare a read-only report of project risks'};
 test('authorized intake returns non-executing draft',async()=>{const d=await make().prepare(input);assert.equal(d.agentId,staff.id);assert.equal(d.dispatchEnabled,false);assert.equal(d.preparedForPrincipal,'patrick')});
 test('denies invalid session',async()=>{const x=createAuthenticatedStaffIntake({sessionProvider:async()=>null,identity:{authenticate:async()=>({authenticated:true})},registry:{loadStaff:async()=>staff,canPrepare:async()=>true}});await assert.rejects(x.prepare(input),{code:'SESSION_REQUIRED'})});

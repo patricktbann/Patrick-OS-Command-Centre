@@ -1,4 +1,4 @@
-﻿/** V3.6 private read-only staff intake; no dispatch or persistence. */
+/** V3.6 private read-only staff intake; no dispatch or persistence. */
 import {prepareStaffTask} from './staff-task-pilot.mjs';
 import {DispatchError} from './dispatch.mjs';
 export function createAuthenticatedStaffIntake({sessionProvider,identity,registry}={}){
@@ -17,7 +17,7 @@ export function createAuthenticatedStaffIntake({sessionProvider,identity,registr
    if(typeof registry.canPrepare!=='function'||await registry.canPrepare(principal,staff)!==true)
     throw new DispatchError('STAFF_ACCESS_DENIED','Principal lacks staff scope');
    const draft=prepareStaffTask({agent:staff,objective:input?.objective,repository:input?.repository});
-   return Object.freeze({...draft,preparedForPrincipal:principal.id,executionStatus:'NOT_CONNECTED',dispatchEnabled:false});
+   return Object.freeze({...draft,preparedForPrincipal:principal.subject,executionStatus:'NOT_CONNECTED',dispatchEnabled:false});
   }
  });
 }

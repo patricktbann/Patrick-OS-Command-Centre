@@ -56,7 +56,7 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
    else if(path==='/api/staff'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
      const principal=session?await identity.authenticate(session):null;
-     const allowed=principal?.authenticated===true&&principal?.id==='patrick-principal'&&typeof staffRegistry?.listStaff==='function';
+     const allowed=principal?.authenticated===true&&principal?.subject==='patrick-principal'&&typeof staffRegistry?.listStaff==='function';
      const staff=allowed?await staffRegistry.listStaff(principal):[];
      response={status:allowed?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
        body:JSON.stringify(allowed?{staff,executionEnabled:false}:{error:'SESSION_REQUIRED'})};
