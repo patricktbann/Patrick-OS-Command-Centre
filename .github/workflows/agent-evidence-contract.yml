@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run evidence state machine tests
-        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs agent-runtime/authenticated-approvals.test.mjs agent-runtime/release-gates.test.mjs agent-runtime/local-sdk-bridge.test.mjs agent-runtime/governed-sdk-inspection.test.mjs agent-runtime/session-bound-sdk-authority.test.mjs agent-runtime/postgres-session-identity.test.mjs
+        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs agent-runtime/authenticated-approvals.test.mjs agent-runtime/release-gates.test.mjs agent-runtime/local-sdk-bridge.test.mjs agent-runtime/governed-sdk-inspection.test.mjs agent-runtime/session-bound-sdk-authority.test.mjs agent-runtime/postgres-session-identity.test.mjs agent-runtime/github-oauth-session-issuer.test.mjs
       - name: Validate Codex SDK pilot Python syntax without signing in
         run: python3 -m py_compile agent-runtime/codex-sdk-readonly-pilot.py agent-runtime/codex-sdk-login.py
       - name: Install and inspect official Codex SDK API without logging in

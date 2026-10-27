@@ -7,6 +7,7 @@ import {createPostgresApprovals} from './postgres-approvals.mjs';
 import {taskDigest} from './task-digest.mjs';
 import {createHash,randomBytes} from 'node:crypto';
 import {createPostgresSessionIdentity} from './postgres-session-identity.mjs';
+import {createGitHubOAuthIssuer} from './github-oauth-session-issuer.mjs';
 import {createAtomicSdkReservationStore} from './postgres-sdk-reservation.mjs';
 
 const required=['PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE'];
@@ -22,7 +23,8 @@ const schema=await readFile(new URL('./sql/001-agent-dispatch.sql',import.meta.u
 const approvalSchema=await readFile(new URL('./sql/002-agent-approvals.sql',import.meta.url),'utf8');
 const sdkSchema=await readFile(new URL('./sql/003-atomic-sdk-reservation.sql',import.meta.url),'utf8');
 const sessionSchema=await readFile(new URL('./sql/004-private-sessions.sql',import.meta.url),'utf8');
-try{await pool.query(schema);await pool.query(approvalSchema);await pool.query(sdkSchema);await pool.query(sessionSchema)}catch(e){await pool.end();throw e}
+const oauthSchema=await readFile(new URL('./sql/005-oauth-login-state.sql',import.meta.url),'utf8');
+try{await pool.query(schema);await pool.query(approvalSchema);await pool.query(sdkSchema);await pool.query(sessionSchema);await pool.query(oauthSchema)}catch(e){await pool.end();throw e}
 const store=createPostgresReservationStore(pool);
 const tag='it-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT;
 const taskId=tag+'-concurrent';
@@ -233,4 +235,34 @@ test('real PostgreSQL: expired session never authenticates',async()=>{
  await pool.query('INSERT INTO agent_private_session(session_hash,principal_id,issued_at,expires_at) VALUES($1,$2,now()-interval \'2 hours\',now()-interval \'1 hour\')',[hash,'patrick-principal']);
  const identity=createPostgresSessionIdentity({pool});
  assert.equal(await identity.authenticate({serverValidated:true,opaque:token}),null);
+});
+
+test('real PostgreSQL: OAuth login state is single-use and issued session can be revoked',async()=>{
+ const numericId=316092977;
+ const issuer=createGitHubOAuthIssuer({pool,clientId:'ci-client',clientSecret:'ci-only-secret',
+ redirectUri:'https://test.example/callback',expectedGitHubUserId:numericId,
+ principalId:'patrick-principal',fetchFn:async(url)=>{
+  if(url.includes('/access_token'))return {ok:true,json:async()=>({access_token:'ci-placeholder-token'})};
+  return {ok:true,json:async()=>({id:numericId})};
+ }});
+ const {authorizationUrl}=await issuer.beginLogin();
+ const state=new URL(authorizationUrl).searchParams.get('state');
+ const result=await issuer.completeLogin({code:'ci-test-code',state});
+ const secret=result.serverSessionSecret;
+ const identity=createPostgresSessionIdentity({pool});
+ assert.deepEqual(await identity.authenticate({serverValidated:true,opaque:secret}),{authenticated:true,subject:'patrick-principal'});
+ const stateRows=await pool.query('SELECT consumed_at FROM agent_oauth_login_state WHERE state_hash=$1',
+  [createHash('sha256').update(state).digest('hex')]);
+ assert.equal(stateRows.rows.length,1);assert.ok(stateRows.rows[0].consumed_at);
+ await assert.rejects(issuer.completeLogin({code:'ci-test-code',state}),e=>e.code==='OAUTH_DENIED');
+ assert.deepEqual(await issuer.revokeSession(secret),{revoked:true});
+ assert.equal(await identity.authenticate({serverValidated:true,opaque:secret}),null);
+});
+test('real PostgreSQL: unknown OAuth state is denied without session issuance',async()=>{
+ let touched=false;const issuer=createGitHubOAuthIssuer({pool,clientId:'ci-client',
+ clientSecret:'ci-only-secret',redirectUri:'https://test.example/callback',
+ expectedGitHubUserId:316092977,principalId:'patrick-principal',
+ fetchFn:async()=>{touched=true;throw Error('Unexpected external exchange')}});
+ await assert.rejects(issuer.completeLogin({code:'ci-test-code',state:'q'.repeat(43)}),e=>e.code==='OAUTH_DENIED');
+ assert.equal(touched,false);
 });
