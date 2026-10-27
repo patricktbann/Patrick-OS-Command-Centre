@@ -17,7 +17,7 @@ export function createAuthenticatedStaffIntake({sessionProvider,identity,registr
    if(typeof registry.canPrepare!=='function'||await registry.canPrepare(principal,staff)!==true)
     throw new DispatchError('STAFF_ACCESS_DENIED','Principal lacks staff scope');
    const draft=prepareStaffTask({agent:staff,objective:input?.objective,repository:input?.repository});
-   return Object.freeze({...draft,preparedForPrincipal:principal.id,executionStatus:'NOT_CONNECTED',dispatchEnabled:false});
+   return Object.freeze({...draft,preparedForPrincipal:principal.subject,executionStatus:'NOT_CONNECTED',dispatchEnabled:false});
   }
  });
 }
