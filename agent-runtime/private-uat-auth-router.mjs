@@ -8,6 +8,7 @@
  */
 import {createPrivateOAuthCallback} from './private-oauth-callback.mjs';
 import {DispatchError} from './dispatch.mjs';
+import {createAuthenticatedStaffIntake} from './authenticated-staff-intake.mjs';
 const fixedHeaders=Object.freeze({
  'Cache-Control':'no-store',
  'Pragma':'no-cache',
@@ -59,6 +60,12 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
      const staff=allowed?await staffRegistry.listStaff(principal):[];
      response={status:allowed?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
        body:JSON.stringify(allowed?{staff,executionEnabled:false}:{error:'SESSION_REQUIRED'})};
+   }
+   else if(path==='/api/staff/prepare'&&method==='POST'){
+     // Deliberately disabled until a bounded request-body parser, same-origin
+     // CSRF enforcement, and a server-owned registry have been reviewed.
+     response={status:403,headers:{'Content-Type':'application/json; charset=utf-8'},
+       body:JSON.stringify({error:'PRIVATE_TASK_INTAKE_NOT_ENABLED',dispatchEnabled:false})};
    }
    else response=reply(404,'Not found');
    // Never return request headers, OAuth codes or session secrets in the body.
