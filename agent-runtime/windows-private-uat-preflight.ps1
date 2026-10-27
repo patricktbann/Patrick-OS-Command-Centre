@@ -24,6 +24,16 @@ $certPath=Join-Path $env:LOCALAPPDATA 'PatrickOS\UAT\tls\localhost.crt'
 $keyPath=Join-Path $env:LOCALAPPDATA 'PatrickOS\UAT\tls\localhost.key'
 $tls=(Test-Path -LiteralPath $certPath -PathType Leaf) -and
      (Test-Path -LiteralPath $keyPath -PathType Leaf)
+# Verify Windows' actual certificate chain; file presence is not browser trust.
+$tlsTrusted=$false
+if($tls){
+ try {
+  $cert=[Security.Cryptography.X509Certificates.X509Certificate2]::new($certPath)
+  $chain=[Security.Cryptography.X509Certificates.X509Chain]::new()
+  $chain.ChainPolicy.RevocationMode='NoCheck'
+  $tlsTrusted=$chain.Build($cert)
+ }catch {$tlsTrusted=$false}
+}
 # UAT-only PostgreSQL connection settings must exist in local protected config,
 # not in source control. Presence is not connectivity or database attestation.
 $config=Join-Path $env:LOCALAPPDATA 'PatrickOS\UAT\postgres-uat.config.dpapi'
@@ -33,9 +43,10 @@ flag 'REPOSITORY' $repo
 flag 'NODEJS' ($null -ne $node)
 flag 'OAUTH_SECRET_DPAPI' $dpapi
 flag 'TLS_LOCAL_FILES' $tls
+flag 'TLS_CERT_CHAIN_TRUSTED' $tlsTrusted
 flag 'POSTGRES_UAT_CONFIG' $pgConfig
 if($null -ne $listener){Write-Output 'HTTPS_PORT_18443=IN_USE'}else{Write-Output 'HTTPS_PORT_18443=AVAILABLE'}
-if($repo -and $node -and $dpapi -and $tls -and $pgConfig -and $null -eq $listener){
+if($repo -and $node -and $dpapi -and $tls -and $tlsTrusted -and $pgConfig -and $null -eq $listener){
  Write-Output 'PRIVATE_UAT_STATIC_PREFLIGHT=READY'
  Write-Output 'NO_SERVICES_STARTED_NO_SECRETS_DISCLOSED_NO_DATABASE_WRITTEN'
  exit 0
