@@ -10,6 +10,7 @@ export function createLocalApprovalStore(filename) {
       expires_at TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDING'
     );
+    CREATE TABLE IF NOT EXISTS approval_thread (thread_id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, FOREIGN KEY(request_id) REFERENCES approval_request(id));
     CREATE TABLE IF NOT EXISTS approval_event (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL,
       message_id TEXT UNIQUE, action TEXT NOT NULL,
@@ -30,6 +31,11 @@ export function createLocalApprovalStore(filename) {
         return {id,status:'PENDING'};
       });
     },
+    bindThread(threadId,requestId) {
+      if(!threadId||!requestId)throw Error('INVALID_BINDING');
+      db.prepare('INSERT INTO approval_thread(thread_id,request_id) VALUES(?,?)').run(threadId,requestId);
+    },
+    threads(){return db.prepare('SELECT thread_id,request_id FROM approval_thread').all();},
     decide({id,status,messageId}) {
       if(!id||!messageId||!['APPROVED','REJECTED','REVISION_REQUESTED'].includes(status))throw Error('INVALID_DECISION');
       return transaction(()=>{
@@ -53,3 +59,4 @@ export function createLocalApprovalStore(filename) {
     close(){db.close();}
   });
 }
+

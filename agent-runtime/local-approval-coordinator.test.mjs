@@ -32,3 +32,5 @@ test('non-synthetic task never executes',()=>{
  assert.throws(()=>uat.completeSyntheticTask(request.id),/EXECUTION_NOT_ENABLED/);assert.equal(uat.status(request.id).status,'APPROVED');assert.deepEqual(uat.audit(request.id).map(e=>e.action),['REQUESTED','APPROVED']);uat.close();
 });
 
+
+test('thread binding survives restart',()=>{ const dir=mkdtempSync(join(tmpdir(),'patrick-restart-')); try { const databasePath=join(dir,'recovery.sqlite'); let uat=createLocalApprovalCoordinator({databasePath,verifyProviderMessage:m=>m.providerVerified===true}); uat.request(request,message.threadId); uat.close(); uat=createLocalApprovalCoordinator({databasePath,verifyProviderMessage:m=>m.providerVerified===true}); assert.equal(uat.receive({...message,providerVerified:true}).status,'APPROVED'); assert.equal(uat.completeSyntheticTask(request.id).result,'SYNTHETIC_TASK_COMPLETED'); uat.close(); } finally {rmSync(dir,{recursive:true,force:true})} });

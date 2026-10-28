@@ -13,11 +13,12 @@ const normalize = value => {
 export function createLocalApprovalCoordinator({databasePath,verifyProviderMessage}) {
   if(typeof verifyProviderMessage!=='function')throw Error('PROVIDER_VERIFIER_REQUIRED');
   const store=createLocalApprovalStore(databasePath);
-  const threadBindings=new Map();
+  const threadBindings=new Map(store.threads().map(row=>[row.thread_id,row.request_id]));
   return Object.freeze({
     request(input,threadId) {
       if(!threadId||threadBindings.has(threadId))throw Error('INVALID_THREAD_BINDING');
       const saved=store.create(input);
+      store.bindThread(threadId,input.id);
       threadBindings.set(threadId,input.id);
       return saved;
     },
@@ -53,4 +54,5 @@ export function createLocalApprovalCoordinator({databasePath,verifyProviderMessa
     close(){store.close();}
   });
 }
+
 
