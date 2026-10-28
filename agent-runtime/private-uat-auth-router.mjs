@@ -9,6 +9,7 @@
 import {createPrivateOAuthCallback} from './private-oauth-callback.mjs';
 import {DispatchError} from './dispatch.mjs';
 import {createAuthenticatedStaffIntake} from './authenticated-staff-intake.mjs';
+import {parsePrivateStaffRequest} from './private-staff-request.mjs';
 const fixedHeaders=Object.freeze({
  'Cache-Control':'no-store',
  'Pragma':'no-cache',
@@ -62,10 +63,20 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
        body:JSON.stringify(allowed?{staff,executionEnabled:false}:{error:'SESSION_REQUIRED'})};
    }
    else if(path==='/api/staff/prepare'&&method==='POST'){
-     // Deliberately disabled until a bounded request-body parser, same-origin
-     // CSRF enforcement, and a server-owned registry have been reviewed.
-     response={status:403,headers:{'Content-Type':'application/json; charset=utf-8'},
-       body:JSON.stringify({error:'PRIVATE_TASK_INTAKE_NOT_ENABLED',dispatchEnabled:false})};
+     try{
+       const session=await callback.sessionFromRequest({...req,method:'GET'});
+       const principal=session?await identity.authenticate(session):null;
+       if(principal?.authenticated!==true||principal.subject!=='patrick-principal')throw Error('AUTH_DENIED');
+       const task=parsePrivateStaffRequest({method,origin:header(h,'origin'),expectedOrigin:origin,
+         contentType:header(h,'content-type'),contentLength:Number(header(h,'content-length')),
+         body:input?.body,csrfHeader:header(h,'x-csrf-token'),csrfCookie:undefined});
+       const intake=createAuthenticatedStaffIntake({sessionProvider:async()=>session,identity,registry:staffRegistry});
+       const draft=await intake.prepare(task);
+       response={status:200,headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify(draft)};
+     }catch{
+       response={status:403,headers:{'Content-Type':'application/json; charset=utf-8'},
+         body:JSON.stringify({error:'STAFF_PREPARE_DENIED',dispatchEnabled:false})};
+     }
    }
    else response=reply(404,'Not found');
    // Never return request headers, OAuth codes or session secrets in the body.
