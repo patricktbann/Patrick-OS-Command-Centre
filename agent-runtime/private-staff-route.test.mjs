@@ -64,3 +64,11 @@ test('frozen V3.4 office is served only to authenticated principal without visua
  assert.equal(ok.body,baseline);
  const denied=await router.handle({method:'GET',url:origin+'/ai-office/3d',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});assert.equal(denied.status,401);
 });
+
+test('V3.8 headquarters requires authentication and exposes controlled staff desks',async()=>{
+ const headers={host:'127.0.0.1:18443',cookie:'__Host-patrick_session='+'a'.repeat(43)};
+ const ok=await router.handle({method:'GET',url:origin+'/ai-office/headquarters',headers},{trustedHttps:true});
+ assert.equal(ok.status,200);assert.match(ok.body,/Investment Research Desk/);assert.match(ok.body,/Software Development Desk/);assert.match(ok.body,/Business Development Desk/);assert.match(ok.body,/ai-office\/3d/);
+ const script=await router.handle({method:'GET',url:origin+'/ai-office/headquarters.js',headers},{trustedHttps:true});assert.equal(script.status,200);assert.match(script.body,/api\/staff\/prepare/);
+ const denied=await router.handle({method:'GET',url:origin+'/ai-office/headquarters',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});assert.equal(denied.status,401);
+});
