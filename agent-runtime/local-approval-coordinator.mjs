@@ -49,10 +49,12 @@ export function createLocalApprovalCoordinator({databasePath,verifyProviderMessa
       const ticket=store.release(id);
       return {...ticket,result:'SYNTHETIC_TASK_COMPLETED'};
     },
+    bindings(){return store.threads().map(row=>({threadId:row.thread_id,requestId:row.request_id}));},
     status(id){return store.get(id);},
     audit(id){return store.events(id);},
     close(){store.close();}
   });
 }
+
 
 
