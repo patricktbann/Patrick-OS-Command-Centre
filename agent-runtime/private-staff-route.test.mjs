@@ -31,3 +31,11 @@ test('authenticated AI office landing route returns a private non-executing page
  const noSession=await router.handle({method:'GET',url:origin+'/ai-office',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});
  assert.equal(noSession.status,401);assert.match(noSession.body,/Sign in with GitHub/);
 });
+
+test('UAT client script requires authentication and contains draft-only checks',async()=>{
+ const host='127.0.0.1:18443';
+ const denied=await router.handle({method:'GET',url:origin+'/ai-office/uat.js',headers:{host}},{trustedHttps:true});
+ assert.equal(denied.status,401);
+ const ok=await router.handle({method:'GET',url:origin+'/ai-office/uat.js',headers:{host,cookie:'__Host-patrick_session='+'a'.repeat(43)}},{trustedHttps:true});
+ assert.equal(ok.status,200);assert.match(ok.body,/dispatchEnabled/);assert.match(ok.body,/invalid/);
+});

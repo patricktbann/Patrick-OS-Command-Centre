@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs';
+const uatScript=readFileSync(new URL('./private-staff-uat-client.js',import.meta.url),'utf8');
 /**
  * Private AI Office UAT auth router. This is an inert request handler, NOT a
  * public HTTP server or a TLS terminator. It exposes NO task dispatch endpoint.
@@ -16,7 +18,7 @@ const fixedHeaders=Object.freeze({
  'Pragma':'no-cache',
  'X-Content-Type-Options':'nosniff',
  'Referrer-Policy':'no-referrer',
- 'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+ 'Content-Security-Policy':"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
  'X-Frame-Options':'DENY'
 });
 const reply=(status,body='')=>({status,headers:{'Content-Type':'text/plain; charset=utf-8'},body});
@@ -54,11 +56,17 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
      response={status:session?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
        body:JSON.stringify({authenticated:!!session,csrfToken:session?sessionCsrfToken(session):null})};
    }
+   else if(path==='/ai-office/uat.js'&&method==='GET'){
+     const session=await callback.sessionFromRequest(req);
+     const principal=session?await identity.authenticate(session):null;
+     const allowed=principal?.authenticated===true&&principal.subject==='patrick-principal';
+     response=allowed?{status:200,headers:{'Content-Type':'application/javascript; charset=utf-8'},body:uatScript}:{status:401,headers:{'Content-Type':'text/plain; charset=utf-8'},body:'Unauthorized'};
+   }
    else if(path==='/ai-office'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
      const principal=session?await identity.authenticate(session):null;
      const allowed=principal?.authenticated===true&&principal.subject==='patrick-principal';
-     response=allowed?{status:200,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patrick OS Private UAT</title><body style="font:16px system-ui;margin:5vw;max-width:720px"><h1>Patrick OS — Private AI Staff UAT</h1><p>Authenticated private session verified.</p><p>This is the secure backend landing page, not the frozen V3.4 3D office.</p><p>AI staff task execution remains disabled.</p><p><a href="/auth/session">Check session API</a></p></body></html>`}:{status:401,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><title>Patrick OS Login Required</title><body style="font:16px system-ui;margin:5vw"><h1>Patrick OS Private UAT</h1><p>No active session. Login is manual to avoid repeated GitHub OAuth requests.</p><a href="/auth/github/start">Sign in with GitHub</a></body></html>`};
+     response=allowed?{status:200,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patrick OS Private UAT</title><body style="font:16px system-ui;margin:5vw;max-width:720px"><h1>Patrick OS — Private AI Staff UAT</h1><p>Authenticated private session verified.</p><p>This is the secure backend landing page, not the frozen V3.4 3D office.</p><p>AI staff task execution remains disabled.</p><p><button id="run-uat">Run authenticated draft-only UAT</button></p><pre id="result" aria-live="polite"></pre><script src="/ai-office/uat.js" defer></script></body></html>`}:{status:401,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><title>Patrick OS Login Required</title><body style="font:16px system-ui;margin:5vw"><h1>Patrick OS Private UAT</h1><p>No active session. Login is manual to avoid repeated GitHub OAuth requests.</p><a href="/auth/github/start">Sign in with GitHub</a></body></html>`};
    }   else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
    else if(path==='/api/staff'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
