@@ -23,3 +23,11 @@ test('authenticated session CSRF token permits a draft-only POST',async()=>{
  const denied=await router.handle({method:'POST',url:origin+'/api/staff/prepare',headers:{...headers,origin,'content-type':'application/json','content-length':String(Buffer.byteLength(body)),'x-csrf-token':'x'.repeat(43)},body},{trustedHttps:true});
  assert.equal(denied.status,403);
 });
+
+test('authenticated AI office landing route returns a private non-executing page',async()=>{
+ const headers={host:'127.0.0.1:18443',cookie:'__Host-patrick_session='+'a'.repeat(43)};
+ const r=await router.handle({method:'GET',url:origin+'/ai-office',headers},{trustedHttps:true});
+ assert.equal(r.status,200);assert.match(r.body,/Private AI Staff UAT/);assert.match(r.body,/execution remains disabled/);
+ const noSession=await router.handle({method:'GET',url:origin+'/ai-office',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});
+ assert.equal(noSession.status,303);assert.equal(noSession.headers.Location,origin+'/auth/github/start');
+});

@@ -54,7 +54,12 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
      response={status:session?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
        body:JSON.stringify({authenticated:!!session,csrfToken:session?sessionCsrfToken(session):null})};
    }
-   else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
+   else if(path==='/ai-office'&&method==='GET'){
+     const session=await callback.sessionFromRequest(req);
+     const principal=session?await identity.authenticate(session):null;
+     const allowed=principal?.authenticated===true&&principal.subject==='patrick-principal';
+     response=allowed?{status:200,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patrick OS Private UAT</title><body style="font:16px system-ui;margin:5vw;max-width:720px"><h1>Patrick OS — Private AI Staff UAT</h1><p>Authenticated private session verified.</p><p>This is the secure backend landing page, not the frozen V3.4 3D office.</p><p>AI staff task execution remains disabled.</p><p><a href="/auth/session">Check session API</a></p></body></html>`}:{status:303,headers:{Location:origin+'/auth/github/start'},body:''};
+   }   else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
    else if(path==='/api/staff'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
      const principal=session?await identity.authenticate(session):null;
