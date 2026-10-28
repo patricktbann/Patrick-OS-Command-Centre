@@ -61,3 +61,20 @@ test('allow empty logout POST but reject nonempty Content-Length request bodies'
  assert.equal(payload.status,403);
  assert.equal(f.handled.length,1);
 });
+
+test('bounded POST body is forwarded only on staff prepare route',async()=>{
+ const f=setup();
+ const body='{"agentId":"TSY-A0003"}';
+ const request={...f.req('/api/staff/prepare',{'content-length':String(Buffer.byteLength(body))}),method:'POST',
+  [Symbol.asyncIterator]:async function*(){yield Buffer.from(body)}};
+ const result=await f.run(request);
+ assert.equal(result.status,200);
+ assert.equal(f.handled[0][0].body,body);
+ assert.equal(f.handled[0][1].trustedHttps,true);
+});
+test('oversized staff POST is denied before router',async()=>{
+ const f=setup();
+ const request={...f.req('/api/staff/prepare',{'content-length':'4097'}),method:'POST'};
+ assert.equal((await f.run(request)).status,403);
+ assert.equal(f.handled.length,0);
+});
