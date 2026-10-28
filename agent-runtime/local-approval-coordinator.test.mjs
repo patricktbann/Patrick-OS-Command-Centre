@@ -29,5 +29,6 @@ test('non-synthetic task never executes',()=>{
  const uat=createLocalApprovalCoordinator({databasePath:':memory:',verifyProviderMessage:()=>true});
  uat.request({...request,taskId:'REAL-WORKER'},message.threadId);
  assert.equal(uat.receive(message).status,'APPROVED');
- assert.throws(()=>uat.completeSyntheticTask(request.id),/EXECUTION_NOT_ENABLED/);uat.close();
+ assert.throws(()=>uat.completeSyntheticTask(request.id),/EXECUTION_NOT_ENABLED/);assert.equal(uat.status(request.id).status,'APPROVED');assert.deepEqual(uat.audit(request.id).map(e=>e.action),['REQUESTED','APPROVED']);uat.close();
 });
+

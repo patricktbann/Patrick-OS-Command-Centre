@@ -42,8 +42,10 @@ export function createLocalApprovalCoordinator({databasePath,verifyProviderMessa
       catch(e){return {status:'DECISION_DENIED',reason:e.message}}
     },
     completeSyntheticTask(id) {
+      const pending=store.get(id);
+      // Check authorization and task type BEFORE consuming the one-time release.
+      if(!pending || !pending.task_id.startsWith('SYNTHETIC-'))throw Error('EXECUTION_NOT_ENABLED');
       const ticket=store.release(id);
-      if(!ticket.taskId.startsWith('SYNTHETIC-'))throw Error('EXECUTION_NOT_ENABLED');
       return {...ticket,result:'SYNTHETIC_TASK_COMPLETED'};
     },
     status(id){return store.get(id);},
@@ -51,3 +53,4 @@ export function createLocalApprovalCoordinator({databasePath,verifyProviderMessa
     close(){store.close();}
   });
 }
+
