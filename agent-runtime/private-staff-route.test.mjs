@@ -39,3 +39,18 @@ test('UAT client script requires authentication and contains draft-only checks',
  const ok=await router.handle({method:'GET',url:origin+'/ai-office/uat.js',headers:{host,cookie:'__Host-patrick_session='+'a'.repeat(43)}},{trustedHttps:true});
  assert.equal(ok.status,200);assert.match(ok.body,/dispatchEnabled/);assert.match(ok.body,/invalid/);
 });
+
+test('authenticated margin scenario calculates 45 percent target and rejects forged CSRF',async()=>{
+ const cookie='__Host-patrick_session='+'a'.repeat(43),headers={host:'127.0.0.1:18443',cookie};
+ const sr=await router.handle({method:'GET',url:origin+'/auth/session',headers},{trustedHttps:true});
+ const token=JSON.parse(sr.body).csrfToken;
+ const payload={agentId:'TSY-A0003',entity:'TSY Solutions Sdn Bhd',revenue:100000,directCost:70000,targetMarginPercent:45};
+ const body=JSON.stringify(payload);
+ const req={method:'POST',url:origin+'/api/staff/margin-scenario',headers:{...headers,origin,'content-type':'application/json','content-length':String(Buffer.byteLength(body)),'x-csrf-token':token},body};
+ const ok=await router.handle(req,{trustedHttps:true});assert.equal(ok.status,200);
+ const data=JSON.parse(ok.body);assert.equal(data.grossProfit,30000);assert.equal(data.costReductionRequired,15000);assert.equal(data.meetsTarget,false);assert.equal(data.dispatchEnabled,false);
+ const denied=await router.handle({...req,headers:{...req.headers,'x-csrf-token':'invalid'}},{trustedHttps:true});assert.equal(denied.status,403);
+ const cross=await router.handle({...req,headers:{...req.headers,origin:'https://evil.example'}},{trustedHttps:true});assert.equal(cross.status,403);
+ const other=JSON.stringify({...payload,entity:'Other Company'});
+ const wrong=await router.handle({...req,body:other,headers:{...req.headers,'content-length':String(Buffer.byteLength(other))}},{trustedHttps:true});assert.equal(wrong.status,403);
+});
