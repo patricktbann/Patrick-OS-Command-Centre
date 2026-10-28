@@ -9,3 +9,17 @@ test('verified cookie lists only registered staff without execution rights',asyn
 test('task preparation route fails closed until CSRF and request parsing exist',async()=>{const r=await router.handle({method:'POST',url:origin+'/api/staff/prepare',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});assert.equal(r.status,403);assert.equal(JSON.parse(r.body).dispatchEnabled,false)});
 
 test('identity shape uses verified subject, not caller id',async()=>{const r=await router.handle({method:'GET',url:origin+'/api/staff',headers:{host:'127.0.0.1:18443',cookie:'__Host-patrick_session='+'a'.repeat(43)}},{trustedHttps:true});assert.equal(r.status,200);assert.equal(JSON.parse(r.body).staff.length,3)});
+
+test('authenticated session CSRF token permits a draft-only POST',async()=>{
+ const cookie='__Host-patrick_session='+'a'.repeat(43);
+ const headers={host:'127.0.0.1:18443',cookie};
+ const session=await router.handle({method:'GET',url:origin+'/auth/session',headers},{trustedHttps:true});
+ const token=JSON.parse(session.body).csrfToken;
+ assert.match(token,/^[A-Za-z0-9_-]{43}$/);
+ const body=JSON.stringify({agentId:'TSY-A0003',objective:'Prepare a read-only review of project risks'});
+ const result=await router.handle({method:'POST',url:origin+'/api/staff/prepare',headers:{...headers,origin,'content-type':'application/json','content-length':String(Buffer.byteLength(body)),'x-csrf-token':token},body},{trustedHttps:true});
+ assert.equal(result.status,200);
+ const draft=JSON.parse(result.body);assert.equal(draft.dispatchEnabled,false);assert.equal(draft.agentId,'TSY-A0003');
+ const denied=await router.handle({method:'POST',url:origin+'/api/staff/prepare',headers:{...headers,origin,'content-type':'application/json','content-length':String(Buffer.byteLength(body)),'x-csrf-token':'x'.repeat(43)},body},{trustedHttps:true});
+ assert.equal(denied.status,403);
+});

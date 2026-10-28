@@ -10,6 +10,7 @@ import {createPrivateOAuthCallback} from './private-oauth-callback.mjs';
 import {DispatchError} from './dispatch.mjs';
 import {createAuthenticatedStaffIntake} from './authenticated-staff-intake.mjs';
 import {parsePrivateStaffRequest} from './private-staff-request.mjs';
+import {sessionCsrfToken,verifySessionCsrf} from './private-session-csrf.mjs';
 const fixedHeaders=Object.freeze({
  'Cache-Control':'no-store',
  'Pragma':'no-cache',
@@ -51,7 +52,7 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
    else if(path==='/auth/session'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
      response={status:session?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
-       body:JSON.stringify({authenticated:!!session})};
+       body:JSON.stringify({authenticated:!!session,csrfToken:session?sessionCsrfToken(session):null})};
    }
    else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
    else if(path==='/api/staff'&&method==='GET'){
@@ -67,9 +68,10 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
        const session=await callback.sessionFromRequest({...req,method:'GET'});
        const principal=session?await identity.authenticate(session):null;
        if(principal?.authenticated!==true||principal.subject!=='patrick-principal')throw Error('AUTH_DENIED');
+       if(!verifySessionCsrf(session,header(h,'x-csrf-token')))throw Error('CSRF_DENIED');
        const task=parsePrivateStaffRequest({method,origin:header(h,'origin'),expectedOrigin:origin,
          contentType:header(h,'content-type'),contentLength:Number(header(h,'content-length')),
-         body:input?.body,csrfHeader:header(h,'x-csrf-token'),csrfCookie:undefined});
+         body:input?.body,csrfHeader:header(h,'x-csrf-token'),csrfCookie:sessionCsrfToken(session)});
        const intake=createAuthenticatedStaffIntake({sessionProvider:async()=>session,identity,registry:staffRegistry});
        const draft=await intake.prepare(task);
        response={status:200,headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify(draft)};
