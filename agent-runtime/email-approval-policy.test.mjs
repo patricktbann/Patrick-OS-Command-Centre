@@ -1,0 +1,11 @@
+﻿import test from 'node:test';
+import assert from 'node:assert/strict';
+import { parseApprovalReply, APPROVAL_ADDRESS } from './email-approval-policy.mjs';
+const pending={id:'TSY-AI-0001',status:'PENDING',risk:'LOW',expiresAt:'2099-01-01T00:00:00Z'};
+const reply={from:APPROVAL_ADDRESS,subject:'Re: TSY-AI-0001',body:'APPROVE TSY-AI-0001',verifiedSender:true};
+test('verified low-risk approval is parsed',()=>assert.equal(parseApprovalReply(reply,pending).status,'APPROVED'));
+test('unverified sender cannot approve',()=>assert.equal(parseApprovalReply({...reply,verifiedSender:false},pending).status,'UNVERIFIED_SENDER'));
+test('wrong request ID fails',()=>assert.equal(parseApprovalReply({...reply,body:'APPROVE TSY-AI-9999'},pending).status,'INVALID_DECISION'));
+test('high risk requires stronger confirmation',()=>assert.equal(parseApprovalReply(reply,{...pending,risk:'HIGH'}).status,'STRONG_CONFIRMATION_REQUIRED'));
+test('expired request fails',()=>assert.equal(parseApprovalReply(reply,{...pending,expiresAt:'2000-01-01T00:00:00Z'}).status,'EXPIRED'));
+test('revision needs instructions',()=>assert.equal(parseApprovalReply({...reply,body:'REVISE TSY-AI-0001'},pending).status,'REVISION_REQUIRED'));
