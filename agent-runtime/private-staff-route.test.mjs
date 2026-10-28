@@ -29,5 +29,5 @@ test('authenticated AI office landing route returns a private non-executing page
  const r=await router.handle({method:'GET',url:origin+'/ai-office',headers},{trustedHttps:true});
  assert.equal(r.status,200);assert.match(r.body,/Private AI Staff UAT/);assert.match(r.body,/execution remains disabled/);
  const noSession=await router.handle({method:'GET',url:origin+'/ai-office',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});
- assert.equal(noSession.status,303);assert.equal(noSession.headers.Location,origin+'/auth/github/start');
+ assert.equal(noSession.status,401);assert.match(noSession.body,/Sign in with GitHub/);
 });
