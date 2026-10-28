@@ -54,3 +54,13 @@ test('authenticated margin scenario calculates 45 percent target and rejects for
  const other=JSON.stringify({...payload,entity:'Other Company'});
  const wrong=await router.handle({...req,body:other,headers:{...req.headers,'content-length':String(Buffer.byteLength(other))}},{trustedHttps:true});assert.equal(wrong.status,403);
 });
+
+test('frozen V3.4 office is served only to authenticated principal without visual modification',async()=>{
+ const headers={host:'127.0.0.1:18443',cookie:'__Host-patrick_session='+'a'.repeat(43)};
+ const ok=await router.handle({method:'GET',url:origin+'/ai-office/3d',headers},{trustedHttps:true});
+ assert.equal(ok.status,200);assert.match(ok.body,/THREE/);assert.match(ok.body,/Operations/);
+ const {readFileSync}=await import('node:fs');
+ const baseline=readFileSync(new URL('../tsy-group-office-v3-4-visual-preview.html',import.meta.url),'utf8');
+ assert.equal(ok.body,baseline);
+ const denied=await router.handle({method:'GET',url:origin+'/ai-office/3d',headers:{host:'127.0.0.1:18443'}},{trustedHttps:true});assert.equal(denied.status,401);
+});
