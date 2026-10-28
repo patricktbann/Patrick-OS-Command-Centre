@@ -1,3 +1,5 @@
+import {calculateGrossMarginScenario} from './gross-margin-scenario.mjs';
+import {parseMarginScenarioRequest} from './private-margin-request.mjs';
 import {readFileSync} from 'node:fs';
 const uatScript=readFileSync(new URL('./private-staff-uat-client.js',import.meta.url),'utf8');
 /**
@@ -66,7 +68,7 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
      const session=await callback.sessionFromRequest(req);
      const principal=session?await identity.authenticate(session):null;
      const allowed=principal?.authenticated===true&&principal.subject==='patrick-principal';
-     response=allowed?{status:200,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patrick OS Private UAT</title><body style="font:16px system-ui;margin:5vw;max-width:720px"><h1>Patrick OS — Private AI Staff UAT</h1><p>Authenticated private session verified.</p><p>This is the secure backend landing page, not the frozen V3.4 3D office.</p><p>AI staff task execution remains disabled.</p><p><button id="run-uat">Run authenticated draft-only UAT</button><section><h2>V3.7 Staff Task Preparation (No Execution)</h2><label for="staff-select">Approved AI staff</label> <select id="staff-select"></select><p><label for="staff-objective">Task objective</label></p><textarea id="staff-objective" rows="3" cols="60" maxlength="1000" placeholder="Describe a read-only review (minimum 12 characters)"></textarea><p><button id="prepare-draft">Prepare draft only</button></p><pre id="draft-result" aria-live="polite"></pre></section></p><pre id="result" aria-live="polite"></pre><script src="/ai-office/uat.js" defer></script></body></html>`}:{status:401,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><title>Patrick OS Login Required</title><body style="font:16px system-ui;margin:5vw"><h1>Patrick OS Private UAT</h1><p>No active session. Login is manual to avoid repeated GitHub OAuth requests.</p><a href="/auth/github/start">Sign in with GitHub</a></body></html>`};
+     response=allowed?{status:200,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patrick OS Private UAT</title><body style="font:16px system-ui;margin:5vw;max-width:720px"><h1>Patrick OS — Private AI Staff UAT</h1><p>Authenticated private session verified.</p><p>This is the secure backend landing page, not the frozen V3.4 3D office.</p><p>AI staff task execution remains disabled.</p><p><button id="run-uat">Run authenticated draft-only UAT</button><section><h2>V3.7 Staff Task Preparation (No Execution)</h2><label for="staff-select">Approved AI staff</label> <select id="staff-select"></select><p><label for="staff-objective">Task objective</label></p><textarea id="staff-objective" rows="3" cols="60" maxlength="1000" placeholder="Describe a read-only review (minimum 12 characters)"></textarea><p><button id="prepare-draft">Prepare draft only</button></p><pre id="draft-result" aria-live="polite"></pre><section><h2>Read-only gross margin scenario — TSY Solutions</h2><label>Revenue (RM) <input id="margin-revenue" type="number" min="0.01" step="0.01"></label><p><label>Direct cost (RM) <input id="margin-cost" type="number" min="0" step="0.01"></label></p><p>Target: 45% gross margin. Inputs are illustrative, not verified accounts.</p><button id="margin-run">Calculate scenario only</button><pre id="margin-result" aria-live="polite"></pre></section></section></p><pre id="result" aria-live="polite"></pre><script src="/ai-office/uat.js" defer></script></body></html>`}:{status:401,headers:{'Content-Type':'text/html; charset=utf-8'},body:`<!doctype html><html lang="en"><meta charset="utf-8"><title>Patrick OS Login Required</title><body style="font:16px system-ui;margin:5vw"><h1>Patrick OS Private UAT</h1><p>No active session. Login is manual to avoid repeated GitHub OAuth requests.</p><a href="/auth/github/start">Sign in with GitHub</a></body></html>`};
    }   else if(path==='/auth/logout'&&method==='POST')response=await callback.logout(req);
    else if(path==='/api/staff'&&method==='GET'){
      const session=await callback.sessionFromRequest(req);
@@ -76,7 +78,17 @@ export function createPrivateUatAuthRouter({issuer,identity,origin,staffRegistry
      response={status:allowed?200:401,headers:{'Content-Type':'application/json; charset=utf-8'},
        body:JSON.stringify(allowed?{staff,executionEnabled:false}:{error:'SESSION_REQUIRED'})};
    }
-   else if(path==='/api/staff/prepare'&&method==='POST'){
+   else if(path==='/api/staff/margin-scenario'&&method==='POST'){
+     try{
+       const session=await callback.sessionFromRequest({...req,method:'GET'});
+       const principal=session?await identity.authenticate(session):null;
+       if(principal?.authenticated!==true||principal.subject!=='patrick-principal')throw Error('AUTH_DENIED');
+       if(header(h,'origin')!==origin||header(h,'content-type')!=='application/json'||!verifySessionCsrf(session,header(h,'x-csrf-token')))throw Error('REQUEST_DENIED');
+       const scenarioInput=parseMarginScenarioRequest({body:input?.body,contentLength:Number(header(h,'content-length'))});
+       const scenario=calculateGrossMarginScenario(scenarioInput);
+       response={status:200,headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify({...scenario,entity:scenarioInput.entity})};
+     }catch{response={status:403,headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify({error:'SCENARIO_DENIED',dispatchEnabled:false})}}
+   }   else if(path==='/api/staff/prepare'&&method==='POST'){
      try{
        const session=await callback.sessionFromRequest({...req,method:'GET'});
        const principal=session?await identity.authenticate(session):null;

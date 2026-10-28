@@ -20,14 +20,14 @@ export function createLoopbackHttpsUatHost({router,hostname='127.0.0.1',port=844
    if(host!==expected||req.headers['x-forwarded-host']||
       req.headers['x-forwarded-proto']||req.headers.forwarded||
       req.headers['transfer-encoding']||
-      (req.headers['content-length']!==undefined&&req.headers['content-length']!=='0'&&!(req.method==='POST'&&req.url==='/api/staff/prepare'&&/^[1-9][0-9]{0,3}$/.test(req.headers['content-length'])&&Number(req.headers['content-length'])<=4096))||
+      (req.headers['content-length']!==undefined&&req.headers['content-length']!=='0'&&!(req.method==='POST'&&(req.url==='/api/staff/prepare'||req.url==='/api/staff/margin-scenario')&&/^[1-9][0-9]{0,3}$/.test(req.headers['content-length'])&&Number(req.headers['content-length'])<=4096))||
       req.headers.cookie?.length>4096){
      res.writeHead(403,{'Cache-Control':'no-store','Content-Type':'text/plain'});
      res.end('Denied');return;
    }
    // Body accepted only for this private endpoint, with a strict 4096-byte cap.
    let body;
-   if(req.method==='POST'&&req.url==='/api/staff/prepare'){
+   if(req.method==='POST'&&(req.url==='/api/staff/prepare'||req.url==='/api/staff/margin-scenario')){
      const declared=Number(req.headers['content-length']);
      if(!Number.isInteger(declared)||declared<1||declared>4096){
        res.writeHead(403,{'Cache-Control':'no-store'});res.end('Denied');return;
