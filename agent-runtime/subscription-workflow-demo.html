@@ -1,0 +1,39 @@
+﻿<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSY Workflow SaaS — Internal Demo</title>
+<style>
+body{font:15px system-ui;background:#eef3f8;color:#162838;margin:0}header{background:#102e46;color:white;padding:22px 5vw}main{max-width:960px;margin:24px auto;padding:0 16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:white;padding:22px;border-radius:14px;box-shadow:0 2px 12px #19364b16}label{display:block;margin:12px 0}input,select{display:block;width:100%;padding:10px;box-sizing:border-box;margin-top:5px;border:1px solid #aabaca;border-radius:6px}button{border:0;border-radius:7px;background:#126a83;color:white;padding:10px 14px;cursor:pointer;margin:6px 5px 6px 0}button:disabled{opacity:.4}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #dde6ed}small{color:#4a5d6c}.warning{background:#fff0c9;padding:10px;border-radius:6px}#notice{min-height:20px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style>
+<header><h1>TSY Workflow & Approval</h1><p>Internal product demonstration · Synthetic data only · No payment or live customer access</p></header>
+<main><p class="warning">Demo only: browser memory, no backend or database. Refreshing clears all requests. This is not a production system.</p>
+<div class="grid"><section class="panel"><h2>Submit request</h2><label>Requester<select id="requester"><option value="staff-a">Staff A</option><option value="staff-b">Staff B</option></select></label><label>Request title<input id="title" maxlength="120" placeholder="e.g. Maintenance supplies"></label><label>Amount (RM)<input id="amount" type="number" min="0.01" max="100000" step="0.01"></label><button id="submit">Submit request</button></section>
+<section class="panel"><h2>Approval desk</h2><label>Approver<select id="approver"><option value="manager-a">Manager A</option><option value="manager-b">Manager B</option></select></label><p><small>Only pending requests can be decided. Approval history is retained until the page is refreshed.</small></p><p id="notice" role="status"></p><p><strong id="count">0</strong> requests created</p></section></div>
+<section class="panel" style="margin-top:18px"><h2>Requests</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Requester</th><th>Title</th><th>RM</th><th>Status</th><th>Action</th></tr></thead><tbody id="requests"></tbody></table></div></section>
+<section class="panel" style="margin-top:18px"><h2>Audit trail</h2><ol id="audit"></ol></section></main>
+<script type="module">
+import { createDemoStore } from './subscription-workflow-demo.mjs';
+const store=createDemoStore();const $=id=>document.getElementById(id);
+function message(value){$('notice').textContent=value}
+function render(){
+ const rows=store.list({id:'internal-auditor',role:'auditor'});
+ $('count').textContent=String(rows.length);$('requests').replaceChildren();
+ for(const item of rows){
+ const tr=document.createElement('tr');
+ for(const value of [item.id,item.requesterId,item.title,item.amount.toFixed(2),item.status]){
+ const td=document.createElement('td');td.textContent=value;tr.append(td);
+ }
+ const actions=document.createElement('td');
+ for(const decision of ['APPROVED','REJECTED']){
+ const b=document.createElement('button');b.textContent=decision==='APPROVED'?'Approve':'Reject';b.disabled=item.status!=='PENDING';
+ b.addEventListener('click',()=>{try{store.decide({id:$('approver').value,role:'approver'},item.id,decision);message(item.id+' '+decision.toLowerCase());render()}catch(e){message(e.message)}});actions.append(b);
+ }tr.append(actions);$('requests').append(tr);
+ }
+ $('audit').replaceChildren();
+ for(const event of store.audit({id:'internal-auditor',role:'auditor'})){
+ const li=document.createElement('li');li.textContent=event.sequence+' · '+event.action+' · '+event.requestId+' · '+event.actorId;$('audit').append(li);
+ }
+}
+$('submit').addEventListener('click',()=>{
+ try{const request=store.submit({id:$('requester').value,role:'requester'},{title:$('title').value,amount:Number($('amount').value)});message(request.id+' submitted');$('title').value='';$('amount').value='';render()}catch(e){message(e.message)}
+});render();
+</script></html>
