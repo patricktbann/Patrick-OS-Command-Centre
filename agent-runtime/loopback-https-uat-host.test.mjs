@@ -78,3 +78,14 @@ test('oversized staff POST is denied before router',async()=>{
  assert.equal((await f.run(request)).status,403);
  assert.equal(f.handled.length,0);
 });
+
+test('bounded margin POST is forwarded only through private HTTPS router',async()=>{
+ const f=setup();const body=JSON.stringify({agentId:'TSY-A0003',entity:'TSY Solutions Sdn Bhd',revenue:100000,directCost:70000,targetMarginPercent:45});
+ const request={...f.req('/api/staff/margin-scenario',{'content-length':String(Buffer.byteLength(body))}),method:'POST',[Symbol.asyncIterator]:async function*(){yield Buffer.from(body)}};
+ const result=await f.run(request);assert.equal(result.status,200);assert.equal(f.handled[0][0].body,body);
+ assert.equal(f.handled[0][1].trustedHttps,true);
+});
+test('oversized margin POST denied at HTTPS boundary',async()=>{
+ const f=setup();const request={...f.req('/api/staff/margin-scenario',{'content-length':'4097'}),method:'POST'};
+ assert.equal((await f.run(request)).status,403);assert.equal(f.handled.length,0);
+});
