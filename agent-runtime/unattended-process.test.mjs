@@ -22,9 +22,9 @@ test('independent process starts with private fixture and exits safely on missin
  const dir=mkdtempSync(path.join(tmpdir(),'patrick-worker-process-'));
  try{
   const tokenPath=path.join(dir,'token.json'),credentialsPath=path.join(dir,'client.json');
-  writeFileSync(tokenPath,JSON.stringify({scope:GMAIL_READONLY_SCOPE,access_token:'local-fixture-only',expires_at:Date.now()/1000+3600}));
+  writeFileSync(tokenPath,JSON.stringify({scope:GMAIL_READONLY_SCOPE,access_token:'local-fixture-only',expires_at:0}));
   const env={...process.env,PATRICK_GMAIL_DB_PATH:path.join(dir,'approval.sqlite'),PATRICK_GMAIL_TOKEN_PATH:tokenPath,PATRICK_GMAIL_CLIENT_PATH:credentialsPath,PATRICK_GMAIL_MAX_CYCLES:'1',PATRICK_GMAIL_INTERVAL_MS:'1000'};
-  // Empty SQLite has no bound threads; reader still checks authenticated profile.
+  // Expired fixture token forces local configuration failure before any network call.
   // No live credentials are present, so the worker must not claim healthy UAT.
   const result=await run(env);
   assert.equal(result.code,1);
