@@ -255,7 +255,7 @@ test('real PostgreSQL: OAuth login state is single-use and issued session can be
  const stateRows=await pool.query('SELECT consumed_at FROM agent_oauth_login_state WHERE state_hash=$1',
   [createHash('sha256').update(state).digest('hex')]);
  assert.equal(stateRows.rows.length,1);assert.ok(stateRows.rows[0].consumed_at);
- await assert.rejects(issuer.completeLogin({code:'ci-test-code',state}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(issuer.completeLogin({code:'ci-test-code',state}),e=>e.code==='OAUTH_LOGIN_STATE_REJECTED');
  assert.deepEqual(await issuer.revokeSession(secret),{revoked:true});
  assert.equal(await identity.authenticate({serverValidated:true,opaque:secret}),null);
 });
@@ -264,7 +264,7 @@ test('real PostgreSQL: unknown OAuth state is denied without session issuance',a
  clientSecret:'ci-only-secret',redirectUri:'https://test.example/callback',
  expectedGitHubUserId:316092977,principalId:'patrick-principal',
  fetchFn:async()=>{touched=true;throw Error('Unexpected external exchange')}});
- await assert.rejects(issuer.completeLogin({code:'ci-test-code',state:'q'.repeat(43)}),e=>e.code==='OAUTH_DENIED');
+ await assert.rejects(issuer.completeLogin({code:'ci-test-code',state:'q'.repeat(43)}),e=>e.code==='OAUTH_LOGIN_STATE_REJECTED');
  assert.equal(touched,false);
 });
 
@@ -291,7 +291,7 @@ test('real PostgreSQL: private router OAuth -> callback -> identity -> logout co
  const secret=setCookie.match(/__Host-patrick_session=([A-Za-z0-9_-]+)/)?.[1];
  assert.ok(secret);
  let session=await handle(req('/auth/session','GET',{cookie:'__Host-patrick_session='+secret}));
- assert.equal(session.status,200);assert.deepEqual(JSON.parse(session.body),{authenticated:true});
+ assert.equal(session.status,200);assert.equal(JSON.parse(session.body).authenticated,true);assert.match(JSON.parse(session.body).csrfToken,/^[A-Za-z0-9_-]{43}$/);
  const replay=await handle(req('/auth/github/callback?state='+state+'&code=mock-code','GET',
   {cookie:'__Host-patrick_oauth_state='+state}));
  assert.equal(replay.status,403);

@@ -1,4 +1,4 @@
-﻿import { createLocalApprovalStore } from './local-approval-store.mjs';
+import { createLocalApprovalStore } from './local-approval-store.mjs';
 import { APPROVAL_ADDRESS } from './email-approval-policy.mjs';
 const normalize = value => {
   const raw=String(value||'').trim();
@@ -29,7 +29,8 @@ export function createLocalApprovalCoordinator({databasePath,verifyProviderMessa
       const request=store.get(id);
       if(!request||request.status!=='PENDING')return {status:'NOT_PENDING'};
       if(normalize(message.from)!==APPROVAL_ADDRESS)return {status:'UNVERIFIED_SENDER'};
-      if(!String(message.subject||'').includes(id))return {status:'REQUEST_MISMATCH'};
+      const ids=[...String(message.subject||'').matchAll(/TSY-AI-[0-9]{4,}/g)].map(m=>m[0]);
+      if(ids.length!==1||ids[0]!==id)return {status:'REQUEST_MISMATCH'};
       const first=String(message.body||'').trim().split(/\r?\n/,1)[0].trim();
       const match=/^(APPROVE|REJECT|REVISE)\s+([A-Z0-9-]+)(?:\s*:\s*(.+))?$/i.exec(first);
       let decision;

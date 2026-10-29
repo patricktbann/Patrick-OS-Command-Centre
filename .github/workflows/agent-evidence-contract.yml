@@ -30,7 +30,7 @@ jobs:
       - name: Validate Codex SDK pilot Python syntax without signing in
         run: python3 -m py_compile agent-runtime/codex-sdk-readonly-pilot.py agent-runtime/codex-sdk-login.py agent-runtime/gmail-readonly-oauth.py
       - name: Verify read-only Gmail and local approval boundaries without mailbox access
-        run: node --test agent-runtime/gmail-readonly-reader.test.mjs agent-runtime/local-approval-coordinator.test.mjs agent-runtime/local-approval-store.test.mjs agent-runtime/verified-gmail-provider.test.mjs agent-runtime/durable-first-gmail-poller.test.mjs
+        run: node --test agent-runtime/gmail-readonly-reader.test.mjs agent-runtime/local-approval-coordinator.test.mjs agent-runtime/local-approval-store.test.mjs agent-runtime/verified-gmail-provider.test.mjs agent-runtime/durable-first-gmail-poller.test.mjs agent-runtime/gmail-approval-worker.test.mjs agent-runtime/gmail-readonly-oauth.test.mjs agent-runtime/local-gmail-worker.test.mjs agent-runtime/unattended-process.test.mjs
       - name: Install and inspect official Codex SDK API without logging in
         run: |
           python3 -m pip install --disable-pip-version-check openai-codex

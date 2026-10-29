@@ -67,3 +67,18 @@ separate and requires the repository's isolated GitHub Actions service.
 Google references:
 - https://developers.google.com/identity/protocols/oauth2/native-app
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/get
+
+## Recovery follow-up — 29 October 2026
+
+Node-only enrollment is available in gmail-readonly-oauth.mjs (private client
+and token paths as positional arguments). Existing private token was located and
+refreshed successfully; no new personal consent was needed. Node enrollment was
+verified offline with actual loopback callbacks, invalid-state denial, PKCE and
+mailbox/scope checks; new live Node enrollment was not needed or attempted.
+
+Windows recovery UAT ran in two separate Node processes with one private SQLite
+database. First process recovered from an injected network failure, read the real
+controlled test reply, persisted approval and completed only its synthetic task.
+Second process reopened RELEASED state, recovered again and produced no additional
+audit events. Audit remained REQUESTED, APPROVED, RELEASED. No background service
+is installed. Provider and durable-write retry tests also pass offline.
