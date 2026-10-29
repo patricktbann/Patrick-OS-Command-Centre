@@ -42,11 +42,14 @@ test('OAuth callback issues secure strict session cookie, not secrets in body',a
  assert.match(r.headers['Set-Cookie'][1],/SameSite=Strict/);
  assert.deepEqual(f.calls,['complete']);
 });
-test('session probe only reports boolean, does not disclose identity or token',async()=>{
+test('session probe reports authentication and CSRF token without identity or session secret',async()=>{
  const f=fixture();
  let r=await f.handle(f.req('/auth/session'));assert.equal(r.status,401);
  r=await f.handle(f.req('/auth/session','GET',{cookie:'__Host-patrick_session='+token}));
- assert.equal(r.status,200);assert.deepEqual(JSON.parse(r.body),{authenticated:true});
+ assert.equal(r.status,200);
+ const body=JSON.parse(r.body);
+ assert.deepEqual(Object.keys(body).sort(),['authenticated','csrfToken']);
+ assert.equal(body.authenticated,true);assert.match(body.csrfToken,/^[A-Za-z0-9_-]{43}$/);
  assert.equal(r.body.includes(token),false);assert.equal(r.body.includes('patrick'),false);
 });
 test('logout requires exact Origin and is POST only',async()=>{
