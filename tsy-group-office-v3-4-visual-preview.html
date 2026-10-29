@@ -174,4 +174,4 @@ function jumpTo(i){if(activeDivision>=0){showDivision(i);return}const r=defs[i];
 
 $('fullscreen').onclick=()=>root.requestFullscreen?.().catch(()=>{});
 function resize(){const w=root.clientWidth,h=root.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(flat)map()}new ResizeObserver(resize).observe(root);resize();function draw(){requestAnimationFrame(draw);controls.update();renderer.render(activeDivision<0?scene:detailScene,activeCam)}draw();$('sceneStatus').textContent='V3.4 visual pilot · approved navigation preserved';
-</script></body></html>
+</script><aside id="v36-task-entry" style="position:fixed;right:16px;bottom:16px;z-index:9999;background:#102e40;color:#fff;padding:12px 16px;border:1px solid #6096ac;border-radius:12px;box-shadow:0 5px 24px #0008;font:13px system-ui"><strong>V3.6 Staff Task Pilot</strong><div style="margin-top:6px"><a href="v3-6-staff-task-console.html" style="color:#a9e7ff">Open read-only task console</a></div><small>No autonomous execution enabled</small></aside></body></html>

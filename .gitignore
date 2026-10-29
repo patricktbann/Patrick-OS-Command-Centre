@@ -1,0 +1,10 @@
+# Local Codex SDK pilot output must never be committed
+codex-pilot-evidence.json
+codex-pilot-evidence-*.json
+__pycache__/
+*.pyc
+# Private Gmail credentials, tokens and local UAT databases
+client_secret*.json
+*token*.json
+*.sqlite
+*.sqlite-*

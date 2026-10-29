@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {verifyPilotArtifact} from './verify-pilot.mjs';
+const ctx={taskId:'TSY-PILOT-001',agentId:'TSY-A0001',repository:'patricktbann/Patrick-OS-Command-Centre',headSha:'a'.repeat(40),workflowRunId:'40285270290'};
+const good={...ctx,executionClass:'github-actions-sandbox-test',executorType:'github-actions',codexCloud:false,success:true,exitCode:0,startedAt:'2026-10-26T01:00:00Z',completedAt:'2026-10-26T01:01:00Z'};
+test('matching runner artifact classifies only sandbox test',()=>{const x=verifyPilotArtifact(good,ctx);assert.equal(x.ok,true);assert.equal(x.codexCloudVerified,false);assert.equal(x.autonomousAgentVerified,false)});
+test('reject cross-repository artifact',()=>assert.equal(verifyPilotArtifact({...good,repository:'other/repo'},ctx).ok,false));
+test('reject wrong GitHub run ID',()=>assert.equal(verifyPilotArtifact({...good,workflowRunId:'123'},ctx).ok,false));
+test('reject wrong task or agent',()=>{assert.equal(verifyPilotArtifact({...good,taskId:'other'},ctx).ok,false);assert.equal(verifyPilotArtifact({...good,agentId:'other'},ctx).ok,false)});
+test('reject failed execution',()=>{assert.equal(verifyPilotArtifact({...good,success:false},ctx).ok,false);assert.equal(verifyPilotArtifact({...good,exitCode:1},ctx).ok,false)});
+test('reject fictitious Codex attribution',()=>assert.equal(verifyPilotArtifact({...good,codexCloud:true},ctx).ok,false));
+test('reject nonmatching commit',()=>assert.equal(verifyPilotArtifact({...good,headSha:'b'.repeat(40)},ctx).ok,false));
+test('reject invalid or reversed times',()=>assert.equal(verifyPilotArtifact({...good,completedAt:'2026-10-25T01:00:00Z'},ctx).ok,false));
+test('reject missing artifact and missing independent context',()=>{assert.equal(verifyPilotArtifact(null,ctx).ok,false);assert.equal(verifyPilotArtifact(good,null).ok,false)});

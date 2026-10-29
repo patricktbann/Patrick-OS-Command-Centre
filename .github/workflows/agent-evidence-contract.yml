@@ -1,0 +1,108 @@
+name: Agent evidence contract
+on:
+  pull_request:
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  push:
+    branches:
+      - 'feature/v3.5-agent-evidence-state-machine'
+    paths:
+      - 'agent-runtime/**'
+      - '.github/workflows/agent-evidence-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-contract:
+    name: Verify AI agent task evidence rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run evidence state machine tests
+        run: node --test agent-runtime/evidence.test.mjs agent-runtime/dispatch.test.mjs agent-runtime/postgres-store.test.mjs agent-runtime/trusted-verifier.test.mjs agent-runtime/verify-pilot.test.mjs agent-runtime/reconciliation.test.mjs agent-runtime/codex-executor.test.mjs agent-runtime/reconcile-run.test.mjs agent-runtime/task-digest.test.mjs agent-runtime/authenticated-approvals.test.mjs agent-runtime/release-gates.test.mjs agent-runtime/local-sdk-bridge.test.mjs agent-runtime/governed-sdk-inspection.test.mjs agent-runtime/session-bound-sdk-authority.test.mjs agent-runtime/postgres-session-identity.test.mjs agent-runtime/github-oauth-session-issuer.test.mjs agent-runtime/private-oauth-callback.test.mjs agent-runtime/private-uat-auth-router.test.mjs agent-runtime/loopback-https-uat-host.test.mjs
+      - name: Validate Codex SDK pilot Python syntax without signing in
+        run: python3 -m py_compile agent-runtime/codex-sdk-readonly-pilot.py agent-runtime/codex-sdk-login.py agent-runtime/gmail-readonly-oauth.py
+      - name: Verify read-only Gmail and local approval boundaries without mailbox access
+        run: node --test agent-runtime/gmail-readonly-reader.test.mjs agent-runtime/local-approval-coordinator.test.mjs agent-runtime/local-approval-store.test.mjs agent-runtime/verified-gmail-provider.test.mjs agent-runtime/durable-first-gmail-poller.test.mjs agent-runtime/gmail-approval-worker.test.mjs agent-runtime/gmail-readonly-oauth.test.mjs agent-runtime/local-gmail-worker.test.mjs agent-runtime/unattended-process.test.mjs
+      - name: Install and inspect official Codex SDK API without logging in
+        run: |
+          python3 -m pip install --disable-pip-version-check openai-codex
+          python3 - <<'PY'
+          import importlib.metadata
+          from openai_codex import Codex, Sandbox
+          version=importlib.metadata.version('openai-codex')
+          assert callable(getattr(Codex, 'login_chatgpt', None))
+          assert callable(getattr(Codex, 'login_chatgpt_device_code', None))
+          assert callable(getattr(Codex, 'thread_start', None))
+          assert hasattr(Sandbox, 'read_only')
+          print('Official SDK import and documented interfaces verified:', version)
+          print('AUTHENTICATION NOT ATTEMPTED; NO CODEX RUN EXECUTED')
+          PY
+      - name: Parse Windows host UAT launcher without executing login
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('agent-runtime/windows-first-run.ps1', [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+      - name: Run real GitHub-hosted sandbox pilot
+        run: node agent-runtime/run-pilot.mjs
+      - name: Verify sandbox evidence against GitHub runner context
+        run: node agent-runtime/verify-pilot-cli.mjs
+      - name: Upload sandbox evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsy-agent-sandbox-pr-evidence
+          path: agent-runtime/artifacts/pilot-evidence.json
+          retention-days: 7
+          if-no-files-found: warn
+  postgres-integration:
+    name: Ephemeral PostgreSQL reservation and audit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tsy_ci
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: tsy_agents_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tsy_ci -d tsy_agents_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: tsy_ci
+      PGPASSWORD: disposable_ci_only
+      PGDATABASE: tsy_agents_ci
+      TSY_EPHEMERAL_CI_DB: yes
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable PostgreSQL test driver
+        run: npm install --no-save --no-package-lock pg@8
+      - name: Verify PostgreSQL reservation concurrency and rollback
+        run: bash agent-runtime/sql/integration-test.sh
+      - name: Exercise actual reservation adapter against PostgreSQL
+        run: node --test agent-runtime/postgres.integration.test.mjs
