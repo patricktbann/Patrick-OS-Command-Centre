@@ -39,8 +39,9 @@ export async function createGmailReadonlyReader({ accessToken, fetchImpl = fetch
   return Object.freeze({
     authenticatedMailbox: APPROVAL_ADDRESS,
     verifyMessage: message => trusted.has(message),
-    async findUatThreads() {
-      const query = 'in:sent newer_than:30d {subject:UAT subject:test} "TSY-AI"';
+    async findUatThreads({requestId} = {}) {
+      if (requestId && !/^TSY-AI-\d{4,}$/.test(requestId)) throw Error('INVALID_UAT_REQUEST_ID');
+      const query = requestId ? `in:sent newer_than:30d subject:${requestId}` : 'in:sent newer_than:30d {subject:UAT subject:test} "TSY-AI"';
       const data = await get('/threads?' + new URLSearchParams({ q: query, maxResults: '20' }));
       return (data.threads || []).map(t => t.id).filter(id => /^[a-f0-9]+$/i.test(id));
     },

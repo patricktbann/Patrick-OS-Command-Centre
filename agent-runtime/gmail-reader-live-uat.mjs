@@ -5,12 +5,13 @@ import { createGmailReadonlyReader, loadGmailReadonlyToken } from './gmail-reado
 import { createLocalApprovalCoordinator } from './local-approval-coordinator.mjs';
 
 // Supervised one-shot UAT only. No email sends, scheduler, or business executor.
-const [tokenPath, credentialsPath, privateOutputDirectory, refreshOption] = process.argv.slice(2);
+const [tokenPath, credentialsPath, privateOutputDirectory, ...options] = process.argv.slice(2);
+const requestId=options.find(value=>value.startsWith('--request-id='))?.slice('--request-id='.length);
 if (!tokenPath || !credentialsPath || !privateOutputDirectory) throw Error('PRIVATE_PATH_ARGUMENTS_REQUIRED');
 try {
-  const accessToken = await loadGmailReadonlyToken({tokenPath, credentialsPath,forceRefresh:refreshOption==='--refresh'});
+  const accessToken = await loadGmailReadonlyToken({tokenPath, credentialsPath,forceRefresh:options.includes('--refresh')});
   const reader = await createGmailReadonlyReader({accessToken});
-  const threads = await reader.findUatThreads();
+  const threads = await reader.findUatThreads({requestId});
   console.log(JSON.stringify({check:'LIVE_GMAIL_PROFILE_AND_SEARCH',pass:true,uatThreads:threads.length}));
   let eligible = 0;
   for (const threadId of threads) {
@@ -18,7 +19,7 @@ try {
     for (const message of messages) {
       if (!reader.verifyMessage(message)) continue;
       const ids = [...message.subject.matchAll(/TSY-AI-[0-9]{4,}/g)].map(m=>m[0]);
-      if (ids.length !== 1 || !/\b(UAT|test)\b/i.test(message.subject)) continue;
+      if (ids.length !== 1 || (requestId ? ids[0]!==requestId : !/\b(UAT|test)\b/i.test(message.subject))) continue;
       const line = message.body.trim().split(/\r?\n/)[0].trim();
       if (!/^(APPROVE|REJECT|REVISE)\s+TSY-AI-\d{4,}(?:\s*:\s*.+)?$/i.test(line) && !/^(approved|rejected)\.?$/i.test(line)) continue;
       eligible++;

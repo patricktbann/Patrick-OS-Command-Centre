@@ -23,6 +23,9 @@ function setup(messages=[raw()], profile='patricktbann@gmail.com') {
 test('live reader authenticates mailbox, decodes plain MIME, and accepts only original immutable objects',async()=>{
   const {open,calls}=setup(); const reader=await open();
   assert.deepEqual(await reader.findUatThreads(),['abcd']);
+  assert.deepEqual(await reader.findUatThreads({requestId:'TSY-AI-9001'}),['abcd']);
+  assert(calls.some(c=>new URL(c.url).searchParams.get('q')?.includes('subject:TSY-AI-9001')));
+  await assert.rejects(()=>reader.findUatThreads({requestId:'bad OR in:anywhere'}),/INVALID_UAT_REQUEST_ID/);
   const [message]=await reader.listThreadMessages('abcd');
   assert.equal(message.body,'APPROVE TSY-AI-9901');
   assert.equal(reader.verifyMessage(message),true);

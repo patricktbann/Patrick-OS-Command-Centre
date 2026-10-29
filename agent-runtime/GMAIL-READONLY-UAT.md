@@ -1,5 +1,17 @@
 # Gmail Approval Worker — supervised local UAT
 
+## Verified result — 29 October 2026
+
+Real Google consent, read-only profile access, token refresh, and Gmail retrieval
+passed on the authorized Windows engineering host. The existing controlled test
+TSY-AI-9001 and its owner-sent `Approved.` reply were retrieved from Gmail and
+replayed into an isolated synthetic SQLite request. Approval, persistence after
+database reopen, forged-object denial, replay denial, and exactly-once synthetic
+completion all passed. No email was sent by this runner and no business action
+was executed. All 273 local Node tests passed; isolated PostgreSQL CI tests were
+not run locally. This result covers a supervised replay of real test mail, not
+a newly sent round trip, unattended service, or production deployment.
+
 This pilot uses the existing Patrick OS Google desktop OAuth client. It requests
 only `https://www.googleapis.com/auth/gmail.readonly`. It cannot send, delete,
 label, or modify Gmail. No scheduler, production deployment, or business executor
@@ -19,6 +31,9 @@ before exchanging the code. Enrollment refuses to overwrite an existing token.
 Run `node agent-runtime/gmail-reader-live-uat.mjs <private-token.json>
 <private-client.json> <private-output-directory> [--refresh]` as one command.
 `--refresh` exercises Google's actual refresh endpoint before reading Gmail.
+For an operator-confirmed existing controlled test whose subject lacks UAT/test,
+add `--request-id=TSY-AI-9001`. This selects only that exact request ID and still
+uses a new isolated synthetic database; it never authorizes a real task.
 
 ## Trust and execution boundaries
 
