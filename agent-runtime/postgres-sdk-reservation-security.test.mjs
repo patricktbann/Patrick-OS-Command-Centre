@@ -7,11 +7,12 @@ const binding = Object.freeze({
  approvalId:'approval-001',taskDigest:'a'.repeat(64),
  principalId:'patrick-001',operatorId:'operator-001',allowedActions:['read-repo']
 });
-function fakePool({updateAccepted=true}={}){
+function fakePool({updateAccepted=true,serializeAt=null}={}){
  const calls=[];
  const client={
   async query(sql,params=[]){
    calls.push({sql,params});
+   if(serializeAt && sql.includes(serializeAt))throw Object.assign(new Error('serialization conflict'),{code:'40001'});
    if(sql.includes('SELECT approval_id'))return {rowCount:1};
    if(sql.includes('UPDATE agent_task_dispatch'))return {rowCount:updateAccepted?1:0};
    return {rowCount:1};
@@ -52,4 +53,16 @@ test('SDK outcome mismatch fails closed and rolls back',async()=>{
  }),{code:'SDK_RESERVATION_MISMATCH'});
  assert.ok(pool.calls.some(x=>x.sql==='ROLLBACK'));
  assert.ok(!pool.calls.some(x=>x.sql==='COMMIT'));
+});
+
+test('SDK reservation returns denied on serialization conflict and rolls back',async()=>{
+ const pool=fakePool({serializeAt:'INSERT INTO agent_task_dispatch'});
+ const store=createAtomicSdkReservationStore(pool);
+ assert.deepEqual(await store.reserveWithCurrentApproval(binding),{accepted:false});
+ assert.ok(pool.calls.some(x=>x.sql==='ROLLBACK'));
+ assert.ok(!pool.calls.some(x=>x.sql==='COMMIT'));
+});
+test('SDK reservation does not mask unrelated database errors',async()=>{
+ const pool={async connect(){return {async query(sql){if(sql.includes('SELECT approval_id'))throw Object.assign(new Error('database down'),{code:'08006'});return {rowCount:1}},release(){}}}};
+ await assert.rejects(createAtomicSdkReservationStore(pool).reserveWithCurrentApproval(binding),{code:'08006'});
 });
