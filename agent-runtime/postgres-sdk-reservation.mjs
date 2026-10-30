@@ -16,7 +16,7 @@ function checkBinding(x){
 async function tx(pool,work){
  if(typeof pool?.connect!=='function')throw new DispatchError('SDK_DB_UNAVAILABLE','No PostgreSQL transaction pool');
  const c=await pool.connect();
- try{await c.query('BEGIN');const out=await work(c);await c.query('COMMIT');return out}
+ try{await c.query('BEGIN ISOLATION LEVEL SERIALIZABLE');const out=await work(c);await c.query('COMMIT');return out}
  catch(e){try{await c.query('ROLLBACK')}catch{}throw e}
  finally{c.release()}
 }
@@ -49,8 +49,8 @@ export function createAtomicSdkReservationStore(pool){
     throw new DispatchError('SDK_RUN_UNVERIFIED','Unsupported SDK evidence');
    return tx(pool,async c=>{
     const row=await c.query(
-      "UPDATE agent_task_dispatch SET state='EXECUTING',executor_run_id=$2,executor_type='codex-sdk-local',started_at=now(),updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$3 AND repository=$4 AND task_digest=$5 AND principal_id=$6 AND operator_id=$7 RETURNING task_id",
-      [binding.taskId,result.threadId,binding.approvalId,binding.repository,binding.taskDigest,binding.principalId,binding.operatorId]);
+      "UPDATE agent_task_dispatch SET state='EXECUTING',executor_run_id=$2,executor_type='codex-sdk-local',started_at=now(),updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$3 AND repository=$4 AND task_digest=$5 AND principal_id=$6 AND operator_id=$7 AND allowed_actions=$8::jsonb RETURNING task_id",
+      [binding.taskId,result.threadId,binding.approvalId,binding.repository,binding.taskDigest,binding.principalId,binding.operatorId,JSON.stringify(binding.allowedActions)]);
     if(row.rowCount!==1)throw new DispatchError('SDK_RESERVATION_MISMATCH','Durable task authorization changed');
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'SDK_QA_PENDING',$2::jsonb)",
       [binding.taskId,JSON.stringify({threadId:result.threadId,commitSha:result.commitSha,approvalId:binding.approvalId})]);
@@ -62,8 +62,8 @@ export function createAtomicSdkReservationStore(pool){
    if(reason!=='SDK_OUTCOME_UNCERTAIN')throw new DispatchError('SDK_RECOVERY_DENIED','Unexpected quarantine reason');
    return tx(pool,async c=>{
     const row=await c.query(
-      "UPDATE agent_task_dispatch SET state='RECONCILIATION_REQUIRED',updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$2 AND task_digest=$3 RETURNING task_id",
-      [binding.taskId,binding.approvalId,binding.taskDigest]);
+      "UPDATE agent_task_dispatch SET state='RECONCILIATION_REQUIRED',updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$2 AND task_digest=$3 AND repository=$4 AND principal_id=$5 AND operator_id=$6 AND allowed_actions=$7::jsonb RETURNING task_id",
+      [binding.taskId,binding.approvalId,binding.taskDigest,binding.repository,binding.principalId,binding.operatorId,JSON.stringify(binding.allowedActions)]);
     if(row.rowCount!==1)throw new DispatchError('SDK_RECOVERY_DENIED','Task cannot be quarantined');
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'RECONCILIATION_REQUIRED',$2::jsonb)",
       [binding.taskId,JSON.stringify({reason})]);
