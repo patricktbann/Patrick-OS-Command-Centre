@@ -24,7 +24,7 @@ export function createAtomicSdkReservationStore(pool){
  return Object.freeze({
   async reserveWithCurrentApproval(binding){
    checkBinding(binding);
-   return tx(pool,async c=>{
+   try{return await tx(pool,async c=>{
     // UPDATE/revoke must acquire the same approval row lock. FOR UPDATE
     // yields a clear commit-time cutoff against concurrent revocation.
     const a=await c.query(
@@ -40,7 +40,12 @@ export function createAtomicSdkReservationStore(pool){
       [binding.taskId,JSON.stringify({repository:binding.repository,taskDigest:binding.taskDigest,
         approvalId:binding.approvalId,principalId:binding.principalId,operatorId:binding.operatorId})]);
     return {accepted:true};
-   });
+   });}catch(e){
+    // Serializable conflicts (40001) are not evidence of approval. Fail closed,
+    // never dispatch or retry implicitly; caller may explicitly re-evaluate.
+    if(e?.code==='40001')return {accepted:false};
+    throw e;
+   }
   },
   async recordOutcome(binding,result){
    checkBinding(binding);
