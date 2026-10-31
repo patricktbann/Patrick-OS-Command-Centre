@@ -66,3 +66,34 @@ test('SDK reservation does not mask unrelated database errors',async()=>{
  const pool={async connect(){return {async query(sql){if(sql.includes('SELECT approval_id'))throw Object.assign(new Error('database down'),{code:'08006'});return {rowCount:1}},release(){}}}};
  await assert.rejects(createAtomicSdkReservationStore(pool).reserveWithCurrentApproval(binding),{code:'08006'});
 });
+
+test('SDK snapshots task authorization before awaiting database connection',async()=>{
+ const mutable={...binding,allowedActions:['read-repo']};
+ const pool=fakePool(),store=createAtomicSdkReservationStore(pool);
+ const pending=store.reserveWithCurrentApproval(mutable);
+ mutable.taskDigest='b'.repeat(64);
+ mutable.approvalId='approval-swapped';
+ mutable.allowedActions[0]='merge-pr';
+ assert.deepEqual(await pending,{accepted:true});
+ const approval=pool.calls.find(x=>x.sql.includes('SELECT approval_id'));
+ const reservation=pool.calls.find(x=>x.sql.includes('INSERT INTO agent_task_dispatch'));
+ assert.equal(approval.params[0],binding.approvalId);
+ assert.equal(approval.params[4],binding.taskDigest);
+ assert.equal(reservation.params[3],binding.taskDigest);
+ assert.equal(reservation.params[7],JSON.stringify(['read-repo']));
+});
+test('SDK outcome and quarantine use immutable authorization snapshots',async()=>{
+ for(const method of ['recordOutcome','quarantine']){
+  const mutable={...binding,allowedActions:['read-repo']};
+  const pool=fakePool(),store=createAtomicSdkReservationStore(pool);
+  const pending=method==='recordOutcome'
+   ?store.recordOutcome(mutable,{threadId:'thread-123',executorType:'codex-sdk-local',commitSha:'c'.repeat(40),status:'UAT_QA_PENDING'})
+   :store.quarantine(mutable,{reason:'SDK_OUTCOME_UNCERTAIN'});
+  mutable.taskDigest='b'.repeat(64);
+  mutable.allowedActions[0]='merge-pr';
+  await pending;
+  const q=pool.calls.find(x=>x.sql.includes('UPDATE agent_task_dispatch'));
+  assert.ok(q.params.includes(binding.taskDigest));
+  assert.equal(q.params.at(-1),JSON.stringify(['read-repo']));
+ }
+});
