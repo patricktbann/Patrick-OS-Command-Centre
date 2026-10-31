@@ -97,3 +97,17 @@ test('SDK outcome and quarantine use immutable authorization snapshots',async()=
   assert.equal(q.params.at(-1),JSON.stringify(['read-repo']));
  }
 });
+
+test('SDK snapshots executor evidence before awaited outcome persistence',async()=>{
+ const pool=fakePool(),store=createAtomicSdkReservationStore(pool);
+ const evidence={threadId:'thread-original',executorType:'codex-sdk-local',commitSha:'c'.repeat(40),status:'UAT_QA_PENDING'};
+ const pending=store.recordOutcome(binding,evidence);
+ evidence.threadId='thread-swapped';
+ evidence.commitSha='d'.repeat(40);
+ await pending;
+ const q=pool.calls.find(x=>x.sql.includes('UPDATE agent_task_dispatch'));
+ const audit=pool.calls.find(x=>x.sql.includes("'SDK_QA_PENDING'"));
+ assert.equal(q.params[1],'thread-original');
+ assert.equal(JSON.parse(audit.params[1]).threadId,'thread-original');
+ assert.equal(JSON.parse(audit.params[1]).commitSha,'c'.repeat(40));
+});
