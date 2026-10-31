@@ -55,16 +55,17 @@ export function createAtomicSdkReservationStore(pool){
   },
   async recordOutcome(binding,result){
    const b=snapshotBinding(binding);
-   if(!id(result?.threadId)||result.executorType!=='codex-sdk-local'||
-      !/^[a-f0-9]{40}$/i.test(result?.commitSha??'')||result.status!=='UAT_QA_PENDING')
+   const evidence=Object.freeze({...result});
+   if(!id(evidence?.threadId)||evidence.executorType!=='codex-sdk-local'||
+      !/^[a-f0-9]{40}$/i.test(evidence?.commitSha??'')||evidence.status!=='UAT_QA_PENDING')
     throw new DispatchError('SDK_RUN_UNVERIFIED','Unsupported SDK evidence');
    return tx(pool,async c=>{
     const row=await c.query(
       "UPDATE agent_task_dispatch SET state='EXECUTING',executor_run_id=$2,executor_type='codex-sdk-local',started_at=now(),updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$3 AND repository=$4 AND task_digest=$5 AND principal_id=$6 AND operator_id=$7 AND allowed_actions=$8::jsonb RETURNING task_id",
-      [b.taskId,result.threadId,b.approvalId,b.repository,b.taskDigest,b.principalId,b.operatorId,JSON.stringify(b.allowedActions)]);
+      [b.taskId,evidence.threadId,b.approvalId,b.repository,b.taskDigest,b.principalId,b.operatorId,JSON.stringify(b.allowedActions)]);
     if(row.rowCount!==1)throw new DispatchError('SDK_RESERVATION_MISMATCH','Durable task authorization changed');
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'SDK_QA_PENDING',$2::jsonb)",
-      [b.taskId,JSON.stringify({threadId:result.threadId,commitSha:result.commitSha,approvalId:b.approvalId})]);
+      [b.taskId,JSON.stringify({threadId:evidence.threadId,commitSha:evidence.commitSha,approvalId:b.approvalId})]);
     return {recorded:true};
    });
   },
