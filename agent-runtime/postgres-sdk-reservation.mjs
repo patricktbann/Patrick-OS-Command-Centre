@@ -7,7 +7,13 @@ import {DispatchError} from './dispatch.mjs';
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9][\w.:-]{1,119}$/.test(v);
 const digest=v=>typeof v==='string'&&/^[0-9a-f]{64}$/.test(v);
 const repo=v=>typeof v==='string'&&/^[\w.-]+\/[\w.-]+$/.test(v);
-// Capture authorization scope before the first await. A caller must not be able to\n// mutate a task digest or allowed actions while the DB connection is pending.\nfunction snapshotBinding(binding){\n checkBinding(binding);\n return Object.freeze({...binding,allowedActions:Object.freeze([...binding.allowedActions])});\n}\nfunction checkBinding(x){
+// Capture authorization scope before the first await. A caller must not be able to
+// mutate a task digest or allowed actions while the DB connection is pending.
+function snapshotBinding(binding){
+ checkBinding(binding);
+ return Object.freeze({...binding,allowedActions:Object.freeze([...binding.allowedActions])});
+}
+function checkBinding(x){
  if(!id(x?.taskId)||!repo(x?.repository)||!id(x?.approvalId)||
  !digest(x?.taskDigest)||!id(x?.principalId)||!id(x?.operatorId)||
  !Array.isArray(x?.allowedActions)||x.allowedActions.length!==1||x.allowedActions[0]!=='read-repo')
@@ -23,7 +29,7 @@ async function tx(pool,work){
 export function createAtomicSdkReservationStore(pool){
  return Object.freeze({
   async reserveWithCurrentApproval(binding){
-   checkBinding(binding);
+   const b=snapshotBinding(binding);
    try{return await tx(pool,async c=>{
     // UPDATE/revoke must acquire the same approval row lock. FOR UPDATE
     // yields a clear commit-time cutoff against concurrent revocation.
@@ -48,7 +54,7 @@ export function createAtomicSdkReservationStore(pool){
    }
   },
   async recordOutcome(binding,result){
-   checkBinding(binding);
+   const b=snapshotBinding(binding);
    if(!id(result?.threadId)||result.executorType!=='codex-sdk-local'||
       !/^[a-f0-9]{40}$/i.test(result?.commitSha??'')||result.status!=='UAT_QA_PENDING')
     throw new DispatchError('SDK_RUN_UNVERIFIED','Unsupported SDK evidence');
@@ -63,7 +69,7 @@ export function createAtomicSdkReservationStore(pool){
    });
   },
   async quarantine(binding,{reason}={}){
-   checkBinding(binding);
+   const b=snapshotBinding(binding);
    if(reason!=='SDK_OUTCOME_UNCERTAIN')throw new DispatchError('SDK_RECOVERY_DENIED','Unexpected quarantine reason');
    return tx(pool,async c=>{
     const row=await c.query(
