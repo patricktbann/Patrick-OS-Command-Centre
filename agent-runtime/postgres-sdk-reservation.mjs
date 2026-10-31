@@ -7,7 +7,7 @@ import {DispatchError} from './dispatch.mjs';
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9][\w.:-]{1,119}$/.test(v);
 const digest=v=>typeof v==='string'&&/^[0-9a-f]{64}$/.test(v);
 const repo=v=>typeof v==='string'&&/^[\w.-]+\/[\w.-]+$/.test(v);
-function checkBinding(x){
+// Capture authorization scope before the first await. A caller must not be able to\n// mutate a task digest or allowed actions while the DB connection is pending.\nfunction snapshotBinding(binding){\n checkBinding(binding);\n return Object.freeze({...binding,allowedActions:Object.freeze([...binding.allowedActions])});\n}\nfunction checkBinding(x){
  if(!id(x?.taskId)||!repo(x?.repository)||!id(x?.approvalId)||
  !digest(x?.taskDigest)||!id(x?.principalId)||!id(x?.operatorId)||
  !Array.isArray(x?.allowedActions)||x.allowedActions.length!==1||x.allowedActions[0]!=='read-repo')
@@ -29,16 +29,16 @@ export function createAtomicSdkReservationStore(pool){
     // yields a clear commit-time cutoff against concurrent revocation.
     const a=await c.query(
       "SELECT approval_id FROM agent_task_approval WHERE approval_id=$1 AND task_id=$2 AND repository=$3 AND principal_id=$4 AND task_digest=$5 AND status='APPROVED' FOR UPDATE",
-      [binding.approvalId,binding.taskId,binding.repository,binding.principalId,binding.taskDigest]);
+      [b.approvalId,b.taskId,b.repository,b.principalId,b.taskDigest]);
     if(a.rowCount!==1)return {accepted:false};
     const row=await c.query(
       "INSERT INTO agent_task_dispatch(task_id,state,approval_id,repository,task_digest,principal_id,operator_id,allowed_actions) VALUES($1,'RESERVED',$2,$3,$4,$5,$6,$7::jsonb) ON CONFLICT(task_id) DO NOTHING RETURNING task_id",
-      [binding.taskId,binding.approvalId,binding.repository,binding.taskDigest,binding.principalId,
-       binding.operatorId,JSON.stringify(binding.allowedActions)]);
+      [b.taskId,b.approvalId,b.repository,b.taskDigest,b.principalId,
+       b.operatorId,JSON.stringify(b.allowedActions)]);
     if(row.rowCount!==1)return {accepted:false};
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'RESERVED_APPROVED_SDK',$2::jsonb)",
-      [binding.taskId,JSON.stringify({repository:binding.repository,taskDigest:binding.taskDigest,
-        approvalId:binding.approvalId,principalId:binding.principalId,operatorId:binding.operatorId})]);
+      [b.taskId,JSON.stringify({repository:b.repository,taskDigest:b.taskDigest,
+        approvalId:b.approvalId,principalId:b.principalId,operatorId:b.operatorId})]);
     return {accepted:true};
    });}catch(e){
     // Serializable conflicts (40001) are not evidence of approval. Fail closed,
@@ -55,10 +55,10 @@ export function createAtomicSdkReservationStore(pool){
    return tx(pool,async c=>{
     const row=await c.query(
       "UPDATE agent_task_dispatch SET state='EXECUTING',executor_run_id=$2,executor_type='codex-sdk-local',started_at=now(),updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$3 AND repository=$4 AND task_digest=$5 AND principal_id=$6 AND operator_id=$7 AND allowed_actions=$8::jsonb RETURNING task_id",
-      [binding.taskId,result.threadId,binding.approvalId,binding.repository,binding.taskDigest,binding.principalId,binding.operatorId,JSON.stringify(binding.allowedActions)]);
+      [b.taskId,result.threadId,b.approvalId,b.repository,b.taskDigest,b.principalId,b.operatorId,JSON.stringify(b.allowedActions)]);
     if(row.rowCount!==1)throw new DispatchError('SDK_RESERVATION_MISMATCH','Durable task authorization changed');
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'SDK_QA_PENDING',$2::jsonb)",
-      [binding.taskId,JSON.stringify({threadId:result.threadId,commitSha:result.commitSha,approvalId:binding.approvalId})]);
+      [b.taskId,JSON.stringify({threadId:result.threadId,commitSha:result.commitSha,approvalId:b.approvalId})]);
     return {recorded:true};
    });
   },
@@ -68,10 +68,10 @@ export function createAtomicSdkReservationStore(pool){
    return tx(pool,async c=>{
     const row=await c.query(
       "UPDATE agent_task_dispatch SET state='RECONCILIATION_REQUIRED',updated_at=now() WHERE task_id=$1 AND state='RESERVED' AND approval_id=$2 AND task_digest=$3 AND repository=$4 AND principal_id=$5 AND operator_id=$6 AND allowed_actions=$7::jsonb RETURNING task_id",
-      [binding.taskId,binding.approvalId,binding.taskDigest,binding.repository,binding.principalId,binding.operatorId,JSON.stringify(binding.allowedActions)]);
+      [b.taskId,b.approvalId,b.taskDigest,b.repository,b.principalId,b.operatorId,JSON.stringify(b.allowedActions)]);
     if(row.rowCount!==1)throw new DispatchError('SDK_RECOVERY_DENIED','Task cannot be quarantined');
     await c.query("INSERT INTO agent_dispatch_audit(task_id,event_type,details) VALUES($1,'RECONCILIATION_REQUIRED',$2::jsonb)",
-      [binding.taskId,JSON.stringify({reason})]);
+      [b.taskId,JSON.stringify({reason})]);
     return {recorded:true};
    });
   }
