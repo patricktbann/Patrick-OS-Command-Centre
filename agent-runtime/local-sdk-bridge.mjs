@@ -46,7 +46,7 @@ export async function runLocalCodexReadOnlyUat({repoRoot,pythonPath,execute=comm
  const origin=await cmd('git',['remote','get-url','origin']);
  gate(ORIGIN.test(String(origin).trim()),'wrong repository origin');
  const branch=String(await cmd('git',['branch','--show-current'])).trim();
- gate(branch.startsWith('feature/v3.5-'),'non-feature branch denied');
+ gate(branch==='feature/ai-hq-business-readiness-uat'||branch.startsWith('feature/v3.5-'),'unapproved pilot branch denied');
  const sha=String(await cmd('git',['rev-parse','HEAD'])).trim();
  gate(SHA.test(sha),'unknown commit');
  gate(String(await cmd('git',['status','--porcelain'])).trim()==='','working tree is dirty');
