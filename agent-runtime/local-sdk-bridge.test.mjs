@@ -69,3 +69,48 @@ test('failure remains failure and evidence is removed',async()=>{
  }),/SDK process failed/);
  assert.equal(seen.length,1);
 });
+
+test('approved AI HQ UAT branch executes fixed read-only pilot only',async()=>{
+ const aiBranch='feature/ai-hq-business-readiness-uat';
+ const calls=[],deleted=[];
+ const evidence={...base,branch:aiBranch};
+ const result=await runLocalCodexReadOnlyUat({
+  repoRoot:'/tmp/ai-hq-uat',pythonPath:'python',env:{},
+  execute:async(bin,args)=>{
+   calls.push([bin,...args]);
+   if(bin==='git'){
+    if(args[0]==='remote')return 'https://github.com/patricktbann/Patrick-OS-Command-Centre.git';
+    if(args[0]==='branch')return aiBranch;
+    if(args[0]==='rev-parse')return sha;
+    if(args[0]==='status')return '';
+   }
+   if(bin==='python')return 'SDK task completed';
+   throw Error('unexpected command');
+  },
+  loadEvidence:async()=>JSON.stringify(evidence),
+  removeEvidence:async p=>deleted.push(p)
+ });
+ assert.equal(result.status,'COMPLETED_REQUIRES_HUMAN_QA');
+ assert.equal(result.approvedForDispatch,false);
+ assert.equal(result.approvedForDeployment,false);
+ assert.equal(calls.filter(x=>x[0]==='python').length,1);
+ assert.equal(deleted.length,1);
+});
+
+test('unapproved branches cannot reach Python SDK',async()=>{
+ for(const candidate of ['main','feature/v3.6-unapproved','feature/ai-hq-business-readiness-uat-extra']){
+  let pythonCalled=false;
+  await assert.rejects(runLocalCodexReadOnlyUat({
+   repoRoot:'/tmp/ai-hq-uat',pythonPath:'python',env:{},
+   execute:async(bin,args)=>{
+    if(bin==='git'){
+     if(args[0]==='remote')return 'https://github.com/patricktbann/Patrick-OS-Command-Centre.git';
+     if(args[0]==='branch')return candidate;
+    }
+    if(bin==='python')pythonCalled=true;
+    return '';
+   }
+  }),/unapproved pilot branch denied/);
+  assert.equal(pythonCalled,false);
+ }
+});
