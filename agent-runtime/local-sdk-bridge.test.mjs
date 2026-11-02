@@ -114,3 +114,47 @@ test('unapproved branches cannot reach Python SDK',async()=>{
   assert.equal(pythonCalled,false);
  }
 });
+
+test('real SDK evidence file is removed before post-run clean-tree check',async()=>{
+ const events=[];
+ let evidencePresent=false;
+ const r=await runLocalCodexReadOnlyUat({
+  repoRoot:'/tmp/ai-hq-uat',pythonPath:'python',env:{},
+  execute:async(bin,args)=>{
+   if(bin==='git'){
+    if(args[0]==='remote')return 'https://github.com/patricktbann/Patrick-OS-Command-Centre.git';
+    if(args[0]==='branch')return 'feature/ai-hq-business-readiness-uat';
+    if(args[0]==='rev-parse')return sha;
+    if(args[0]==='status'){
+     events.push('status');
+     return evidencePresent?'?? codex-pilot-evidence-test.json':'';
+    }
+   }
+   if(bin==='python'){evidencePresent=true;events.push('sdk');return 'SDK task completed';}
+   throw Error('unexpected command');
+  },
+  loadEvidence:async()=>JSON.stringify({...base,branch:'feature/ai-hq-business-readiness-uat'}),
+  removeEvidence:async()=>{events.push('remove');evidencePresent=false;}
+ });
+ assert.equal(r.status,'COMPLETED_REQUIRES_HUMAN_QA');
+ assert.deepEqual(events,['status','sdk','remove','status']);
+});
+
+test('SDK evidence cleanup cannot hide unrelated dirty files',async()=>{
+ let evidencePresent=false;
+ await assert.rejects(runLocalCodexReadOnlyUat({
+  repoRoot:'/tmp/ai-hq-uat',pythonPath:'python',env:{},
+  execute:async(bin,args)=>{
+   if(bin==='git'){
+    if(args[0]==='remote')return 'https://github.com/patricktbann/Patrick-OS-Command-Centre.git';
+    if(args[0]==='branch')return 'feature/ai-hq-business-readiness-uat';
+    if(args[0]==='rev-parse')return sha;
+    if(args[0]==='status')return evidencePresent?' M agent-runtime/dispatch.mjs':'';
+   }
+   if(bin==='python'){evidencePresent=true;return 'SDK task completed';}
+   throw Error('unexpected command');
+  },
+  loadEvidence:async()=>JSON.stringify({...base,branch:'feature/ai-hq-business-readiness-uat'}),
+  removeEvidence:async()=>{}
+ }),/dirty working tree after SDK/);
+});
