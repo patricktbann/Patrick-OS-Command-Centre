@@ -46,13 +46,14 @@ export async function runLocalCodexReadOnlyUat({repoRoot,pythonPath,execute=comm
  const origin=await cmd('git',['remote','get-url','origin']);
  gate(ORIGIN.test(String(origin).trim()),'wrong repository origin');
  const branch=String(await cmd('git',['branch','--show-current'])).trim();
- gate(branch.startsWith('feature/v3.5-'),'non-feature branch denied');
+ gate(branch==='feature/ai-hq-business-readiness-uat'||branch.startsWith('feature/v3.5-'),'unapproved pilot branch denied');
  const sha=String(await cmd('git',['rev-parse','HEAD'])).trim();
  gate(SHA.test(sha),'unknown commit');
  gate(String(await cmd('git',['status','--porcelain'])).trim()==='','working tree is dirty');
  const filename='codex-pilot-evidence-'+randomUUID()+'.json';
  const path=join(root,filename);
  let started=false;
+ let evidenceRemoved=false;
  try{
    started=true;
    // Only the fixed review task inside the pilot is executable. No objective,
@@ -60,12 +61,17 @@ export async function runLocalCodexReadOnlyUat({repoRoot,pythonPath,execute=comm
    await cmd(pythonPath,['agent-runtime/codex-sdk-readonly-pilot.py','--execute','--output',filename],
      {timeout:600000,maxBuffer:256*1024,env:{...env,OPENAI_API_KEY:''}});
    const evidence=JSON.parse(await loadEvidence(path,'utf8'));
+   // The evidence file itself is untracked. Delete it BEFORE the clean-tree
+   // check; otherwise a successful SDK run is always rejected as dirty.
+   // Cleanup failures must fail closed rather than approving a dirty checkout.
+   await removeEvidence(path);
+   evidenceRemoved=true;
    const after=String(await cmd('git',['status','--porcelain'])).trim()==='';
    const finalSha=String(await cmd('git',['rev-parse','HEAD'])).trim();
    return await verifyLocalSdkEvidence({evidence,context:{branch,sha},
       cleanAfter:after&&sha===finalSha});
  }finally{
-   if(started){
+   if(started&&!evidenceRemoved){
      // Evidence contains model-generated review text; do not upload or commit.
      // Removal failure is a hard error, preventing accidental disclosure.
      await removeEvidence(path).catch(e=>{if(e.code!=='ENOENT')throw e});

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 EXPECTED_REPOSITORY = "patricktbann/Patrick-OS-Command-Centre"
 DEFAULT_TASK = (
-    "Read only: inspect the V3.5 agent-runtime and produce a security review. "
+    "Read only: inspect the AI HQ agent-runtime and produce a security review. "
     "Do not modify files, create commits, push, deploy, merge or invoke external services. "
     "Report specific remaining blockers for a genuine authenticated Codex executor."
 )
@@ -32,8 +32,8 @@ def preflight(root: Path) -> dict:
     if top != root:
         raise RuntimeError("Run from repository root")
     branch = git("-C", str(root), "branch", "--show-current")
-    if not branch.startswith("feature/v3.5-"):
-        raise RuntimeError("Only non-production V3.5 feature branches allowed")
+    if branch not in ("feature/ai-hq-business-readiness-uat",) and not branch.startswith("feature/v3.5-"):
+        raise RuntimeError("Only explicitly approved non-production pilot branches allowed")
     if git("-C", str(root), "status", "--porcelain"):
         raise RuntimeError("Working tree must be clean before Codex session")
     origin = git("-C", str(root), "remote", "get-url", "origin")
